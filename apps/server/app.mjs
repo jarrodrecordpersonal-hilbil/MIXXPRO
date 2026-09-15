@@ -1,3 +1,4 @@
+import {screenActivityRoutes} from './routes/screen-activity.mjs';
 import {authRoutes} from './routes/auth.mjs';
 import {playerRoutes} from './routes/player.mjs';
 import {venueRoutes} from './routes/venue.mjs';
@@ -33,7 +34,7 @@ export function createApplication(options={}){
   const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data));};
   const audit=(actor,venue,action,detail={})=>db.run('INSERT INTO audit VALUES(?,?,?,?,?,?)',id(),actor,venue,action,JSON.stringify(detail),now());
   const transaction=fn=>db.transaction(fn);
-  const getVenue=(venueId)=>{const v=db.get('SELECT * FROM venues WHERE id=?',venueId);if(!v)fail(404,'Venue not found.');return {...v,mix:parse(v.mix,DEFAULT_MIX)};};
+  const getVenue=(venueId)=>{const v=db.get('SELECT * FROM venues WHERE id=?',venueId);if(!v)fail(404,'Venue not found.');return {...v,mix:parse(v.mix,DEFAULT_MIX),location:db.get('SELECT address,city,region,postal_code AS postalCode,country,updated_at AS updatedAt FROM venue_locations WHERE venue_id=?',venueId)||null};};
   const schedulesFor=v=>db.all('SELECT * FROM schedules WHERE venue_id=? ORDER BY created_at DESC',v).map(s=>({...s,days:parse(s.days,[]),tv_ids:parse(s.tv_ids,[]),mix:parse(s.mix)}));
   const tvRows=v=>db.all('SELECT id,venue_id,name,group_name,rotation_seed,revoked,mix,theme,last_seen,cache_seconds,cache_bytes,playing,current_title,last_ack,created_at FROM tvs WHERE venue_id=? AND revoked=0 ORDER BY created_at,id',v).map(t=>({...t,mix:t.mix?parse(t.mix):null,online:!!t.last_seen&&now()-t.last_seen<45000}));
   function readSession(req){
@@ -84,7 +85,7 @@ export function createApplication(options={}){
     const current=effective(tv,venue),catalog=db.all('SELECT * FROM content').map(c=>({...c,worlds:parse(c.worlds,[]),tags:parse(c.tags,[])}));
     const window=Math.floor(now()/(current.mix.minutes*60000));
     const candidates=db.all('SELECT * FROM campaigns WHERE active=1 AND starts_at<=? AND ends_at>?',now(),now());
-    const fingerprint=hash(JSON.stringify([current,venue.plan,venue.accent,catalog,candidates,window]));
+    const fingerprint=hash(JSON.stringify([current,venue.plan,venue.accent,tv.name,venue.name,venue.location,catalog,candidates,window]));
     const prior=db.get('SELECT payload FROM manifests WHERE tv_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 1',tv.id,now()+300000);
     if(prior){const saved=parse(prior.payload);if(saved.fingerprint===fingerprint)return saved;}
     let queue=rotation(catalog,{...current.mix,seed:(current.mix.seed+window)%2147483647},venue.plan);
@@ -96,8 +97,8 @@ export function createApplication(options={}){
       let remain=current.mix.minutes*60;queue=withAds.flatMap(c=>{if(remain<=0)return [];const playSeconds=Math.min(c.playSeconds,remain);remain-=playSeconds;return [{...c,playSeconds}];});
     }
     const manifestId=id(),created=now(),expires=Math.min(created+6*3600000,...queue.map(c=>Math.min(c.rights_until||Infinity,c.campaignId?(campaigns.find(a=>a.id===c.campaignId)?.ends_at||Infinity):Infinity)));
-    const publicItems=queue.map((c,index)=>({index,contentId:c.id,campaignId:c.campaignId||null,title:c.title,world:c.world,duration:c.duration,playSeconds:c.playSeconds,cacheKey:`${c.provider}:${c.asset_id}:${c.resolution}`,url:c.provider==='demo'?'/demo/sample.mp4':bunnyUrl(c.asset_id,c.resolution,config,Math.floor(expires/1000)),demo:c.provider==='demo'}));
-    const result={id:manifestId,fingerprint,tvId:tv.id,venueName:venue.name,theme:current.theme,accent:venue.accent,mix:current.mix,createdAt:created,expiresAt:expires,items:publicItems};
+    const publicItems=queue.map((c,index)=>({index,contentId:c.id,campaignId:c.campaignId||null,campaignName:campaigns.find(a=>a.id===c.campaignId)?.name||null,brandId:campaigns.find(a=>a.id===c.campaignId)?.brand_id||null,title:c.title,world:c.world,duration:c.duration,playSeconds:c.playSeconds,cacheKey:`${c.provider}:${c.asset_id}:${c.resolution}`,url:c.provider==='demo'?'/demo/sample.mp4':bunnyUrl(c.asset_id,c.resolution,config,Math.floor(expires/1000)),demo:c.provider==='demo'}));
+    const result={id:manifestId,fingerprint,tvId:tv.id,tvName:tv.name,venueName:venue.name,venueLocation:venue.location||null,theme:current.theme,accent:venue.accent,mix:current.mix,createdAt:created,expiresAt:expires,items:publicItems};
     transaction(()=>{
       db.run('INSERT INTO manifests VALUES(?,?,?,?,?)',manifestId,tv.id,JSON.stringify(result),expires,created);
       const codes=new Map();for(const item of publicItems){const key=`${item.contentId}:${item.campaignId}`;if(!codes.has(key)){const code=token(9);db.run('INSERT INTO qr_links VALUES(?,?,?,?,?,?,?)',code,venue.id,tv.id,item.contentId,item.campaignId,manifestId,expires);codes.set(key,code);}item.qrUrl=`${config.APP_ORIGIN}/r/${codes.get(key)}`;item.qrImage=`/qr/${codes.get(key)}.svg`;}
@@ -124,7 +125,7 @@ export function createApplication(options={}){
       }
       let raw='',b={};if(mutation){raw=await body(req);try{b=raw?JSON.parse(raw):{};}catch{fail(400,'Invalid JSON.');}if(!b||typeof b!=='object'||Array.isArray(b))fail(400,'Expected a JSON object.');}
       const context={req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg};
-      for(const route of [authRoutes,playerRoutes,venueRoutes,billingRoutes,publicRoutes,adminRoutes]){await route(context);if(res.writableEnded)return;}
+      for(const route of [authRoutes,playerRoutes,venueRoutes,billingRoutes,publicRoutes,adminRoutes,screenActivityRoutes]){await route(context);if(res.writableEnded)return;}
       if(path.startsWith('/api/'))fail(404,'API route not found.');
       if(method!=='GET'&&method!=='HEAD')fail(405,'Method not allowed.');
       if(path==='/demo/sample.mp4'){
@@ -133,7 +134,7 @@ export function createApplication(options={}){
         if(match){start=Number(match[1]);end=match[2]?Number(match[2]):end;if(start>end||end>=size){res.writeHead(416,{'Content-Range':`bytes */${size}`});return res.end();}status=206;res.setHeader('Content-Range',`bytes ${start}-${end}/${size}`);}
         res.writeHead(status,{'Content-Type':'video/mp4','Content-Length':end-start+1,'Accept-Ranges':'bytes','Cache-Control':'private, max-age=60'});if(method==='HEAD')return res.end();return createReadStream(file,{start,end}).pipe(res);
       }
-      const files={'/app.mjs':'apps/web/public/app.mjs','/style.css':'apps/web/public/style.css','/player/player.mjs':'apps/player/public/player.mjs','/player/offline.mjs':'apps/player/public/offline.mjs','/player/sw.js':'apps/player/public/sw.js','/player/manifest.webmanifest':'apps/player/public/manifest.webmanifest','/shared/domain.mjs':'packages/domain/src/runtime.mjs','/icon.svg':'apps/web/public/icon.svg','/public.mjs':'apps/web/public/public.mjs'};
+      const files={'/screens':'apps/web/screens/index.html','/screens/app.mjs':'apps/web/screens/app.mjs','/screens/style.css':'apps/web/screens/style.css','/screens-link.mjs':'apps/web/screens/link.mjs','/app.mjs':'apps/web/public/app.mjs','/style.css':'apps/web/public/style.css','/player/player.mjs':'apps/player/public/player.mjs','/player/offline.mjs':'apps/player/public/offline.mjs','/player/sw.js':'apps/player/public/sw.js','/player/manifest.webmanifest':'apps/player/public/manifest.webmanifest','/shared/domain.mjs':'packages/domain/src/runtime.mjs','/icon.svg':'apps/web/public/icon.svg','/public.mjs':'apps/web/public/public.mjs'};
       const file=files[path]||(path==='/player'||path==='/player/'?'apps/player/public/index.html':/^\/r\/[A-Za-z0-9_-]+$/.test(path)?'apps/web/public/public.html':path==='/'||['/mixx','/tvs','/themes','/revenue','/admin','/brands','/billing','/schedule','/commerce'].includes(path)?'apps/web/public/index.html':null);
       if(!file)fail(404,'Page not found.');
       const mime={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};

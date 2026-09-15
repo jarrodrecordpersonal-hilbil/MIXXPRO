@@ -12,6 +12,7 @@ import time
 import urllib.request
 import uuid
 from playwright.sync_api import sync_playwright, expect
+from screen_browser_checks import screen_checks
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts'
@@ -171,6 +172,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     assert saved['metrics']['dwell'] is None
                     passed('Reconnection drains the outbox into device-reported playback analytics, not human dwell')
 
+                    screen_checks(owner,page,player,BASE,headers,OUT,passed)
                     nav(page, 'home')
                     page.screenshot(path=str(OUT / 'native-home-desktop.png'), full_page=True)
                     page.set_viewport_size({'width': 390, 'height': 844})
