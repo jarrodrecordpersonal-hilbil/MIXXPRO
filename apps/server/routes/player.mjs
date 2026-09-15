@@ -1,3 +1,4 @@
+import {ingestPlaybackEvents} from '../playback-events.mjs';
 /** Player API routes. Authorization remains inside every scoped operation. */
 export async function playerRoutes(context){
   const {req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg}=context;
@@ -58,17 +59,7 @@ export async function playerRoutes(context){
         const {tv,venue}=device(req);rateLimit(db,`manifest:${tv.id}`,40,60000);return json(res,200,manifest(tv,venue));
       }
       if(method==='POST'&&path==='/api/player/events'){
-        const {tv}=device(req);if(!Array.isArray(b.events)||b.events.length>100)fail(400,'Send at most 100 events.');const accepted=[],rejected=[];
-        transaction(()=>{for(const e of b.events){
-          if(!e||typeof e.id!=='string'||e.id.length>80){rejected.push({id:e?.id,reason:'invalid_id'});continue;}
-          if(db.get('SELECT id FROM events WHERE id=?',e.id)){accepted.push(e.id);continue;}
-          const m=db.get('SELECT * FROM manifests WHERE id=? AND tv_id=?',e.manifestId||'',tv.id),issued=m?parse(m.payload):null;
-          const item=issued?.items.find(x=>x.contentId===e.contentId&&(x.campaignId||null)===(e.campaignId||null));
-          const goodTime=Number.isSafeInteger(e.occurredAt)&&e.occurredAt>=m?.created_at-5000&&e.occurredAt<=m?.expires_at&&e.occurredAt<=now()+300000&&e.occurredAt>=now()-7*86400000;
-          if(!item||!goodTime||!['tick','complete','error','start','skip'].includes(e.kind)||typeof e.playbackId!=='string'||e.playbackId.length>80||!Number.isFinite(e.seconds)||e.seconds<0||e.seconds>30){rejected.push({id:e.id,reason:'invalid_context'});continue;}
-          const used=db.get('SELECT COALESCE(SUM(seconds),0) seconds FROM events WHERE tv_id=? AND playback_id=?',tv.id,e.playbackId).seconds;
-          const seconds=e.kind==='tick'?Math.max(0,Math.min(e.seconds,item.duration-used)):0;
-          db.run('INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?)',e.id,tv.id,m.id,item.contentId,item.campaignId,e.playbackId,e.kind,seconds,e.occurredAt,now());accepted.push(e.id);
-        }});return json(res,200,{accepted,rejected});
+        const {tv}=device(req);if(!Array.isArray(b.events)||b.events.length>100)fail(400,'Send at most 100 events.');
+        return json(res,200,ingestPlaybackEvents(db,tv,b.events,now()));
       }
 }

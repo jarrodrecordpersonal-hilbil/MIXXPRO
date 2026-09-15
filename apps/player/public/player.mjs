@@ -1,6 +1,7 @@
 import {THEMES} from '/shared/domain.mjs';
 import {get,put,all,clear,remove,cachedMedia,cacheAsset} from './offline.mjs';
 const $=id=>document.getElementById(id),video=$('video');
+let source='unknown',sequence=0,eventWriteQueue=Promise.resolve();
 let credential=null,manifest=null,pending=null,index=0,current=null,playbackId=null,desired=true,online=false,busy=false,flushing=false,prefetching=false,objectUrl=null,qrObject=null,lastPosition=0,lastTick=performance.now(),offset=0,signature='',lastRefresh=0,lastCommand=0,promotions=[],lastPromotion=0,cacheMessage='',waitingForMedia=false,seatBlocked=false;
 const clock=()=>Date.now()+offset;
 const show=(title,body,button=false)=>{$('overlay-title').textContent=title;$('overlay-body').textContent=body;$('overlay').classList.remove('hidden');$('enable').classList.toggle('hidden',!button);};
@@ -9,21 +10,30 @@ async function request(path,body,secret=credential){
   const response=await fetch('/api/player'+path,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${secret||''}`,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store',signal:AbortSignal.timeout(15000)});
   const data=await response.json();if(!response.ok){const e=new Error(data.error||'Player request failed');e.status=response.status;throw e;}return data;
 }
-async function event(kind,seconds=0){
-  if(!current||!manifest||!playbackId)return;
-  const e={key:crypto.randomUUID(),id:null,manifestId:manifest.id,contentId:current.contentId,campaignId:current.campaignId,playbackId,kind,seconds,occurredAt:clock()};e.id=e.key;
-  const queued=await all('events');if(queued.length>=6000){status('Telemetry queue full · reconnect required');return;}
-  await put('events',e);void flush();
+function event(kind,seconds=0){
+  if(!current||!manifest||!playbackId)return Promise.resolve();
+  // Capture before any await: a later video must not inherit this report's context.
+  const e={key:crypto.randomUUID(),id:null,manifestId:manifest.id,contentId:current.contentId,campaignId:current.campaignId,playbackId,kind,seconds,occurredAt:clock(),source,sequence:++sequence,itemIndex:current.index};e.id=e.key;
+  const write=eventWriteQueue.then(async()=>{
+    if((await all('events')).length>=6000){status('Telemetry queue full · reconnect required');return;}
+    await put('events',e);void flush();
+  });
+  eventWriteQueue=write.catch(()=>{});return write;
 }
 async function flush(){
   if(flushing||!credential)return;flushing=true;
   try{const queue=(await all('events')).slice(0,100);if(queue.length){const result=await request('/events',{events:queue});for(const key of [...result.accepted,...result.rejected.map(x=>x.id)])if(key)await remove('events',key);if(result.rejected.length)status(`${result.rejected.length} old or invalid playback events discarded`);}}catch{/* Durable records remain for retry. */}finally{flushing=false;}
 }
-async function tick(){
+function reportProgress(final=false){
   const elapsed=(performance.now()-lastTick)/1000,position=video.currentTime,progress=Math.max(0,position-lastPosition);
   lastTick=performance.now();lastPosition=position;
-  if(current&&!video.paused&&!video.seeking&&video.readyState>=2&&!document.hidden&&progress>0)await event('tick',Math.max(0,Math.min(elapsed,progress,30)));
-  if(current&&position>=current.playSeconds-.05&&!video.paused)await next('complete');
+  if(current&&(final||!video.paused)&&!video.seeking&&video.readyState>=2&&!document.hidden&&progress>0)
+    return event('tick',Math.max(0,Math.min(elapsed,progress,30)));
+  return Promise.resolve();
+}
+async function tick(){
+  const observed=playbackId;await reportProgress();
+  if(observed===playbackId&&current&&video.currentTime>=current.playSeconds-.05&&!video.paused)await next('complete');
 }
 async function applyTheme(){
   const theme=THEMES.find(t=>t.id===manifest?.theme)||THEMES[0];document.body.style.setProperty('--tv-bg',theme.bg);document.body.style.setProperty('--tv-accent',theme.id==='custom'?manifest.accent:theme.color);
@@ -31,7 +41,7 @@ async function applyTheme(){
 }
 async function refresh(force=false){
   const fresh=await request('/manifest');lastRefresh=Date.now();
-  if(force||!manifest||!current){manifest=fresh;pending=null;index=0;await put('kv',{key:'manifest',value:manifest});await applyTheme();await play();}
+  if(force||!manifest||!current){if(current){await reportProgress();await event('skip');}manifest=fresh;pending=null;index=0;await put('kv',{key:'manifest',value:manifest});await applyTheme();await play();}
   else if(fresh.id!==manifest.id)pending=fresh;
   void prefetch(fresh);
 }
@@ -53,11 +63,11 @@ async function play(){
   if(seatBlocked){video.pause();return;}
   if(!manifest||manifest.expiresAt<=clock()){video.pause();show('Reconnect to refresh your MIXX.','This downloaded programming window has expired.');return;}
   if(!manifest.items.length){current=null;video.pause();$('qr-box').classList.add('hidden');show('Your MIXX is ready for content.','No approved, playable videos match these choices yet. Add licensed content or choose a different MIXX.');return;}
-  current=manifest.items[index%manifest.items.length];playbackId=crypto.randomUUID();
+  current=manifest.items[index%manifest.items.length];playbackId=crypto.randomUUID();sequence=0;source='unknown';
   const media=await cachedMedia(current.cacheKey,clock());
   if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=null;
   waitingForMedia=false;
-  if(media){objectUrl=URL.createObjectURL(media.blob);video.src=objectUrl;}else if(online)video.src=current.url;else {waitingForMedia=true;show('This film has not downloaded yet.','Reconnect to download your next videos. Available cached films will resume automatically.');for(let n=1;n<manifest.items.length;n++){const k=(index+n)%manifest.items.length;if(await cachedMedia(manifest.items[k].cacheKey,clock())){index=k;return play();}}return;}
+  if(media){source='cache';objectUrl=URL.createObjectURL(media.blob);video.src=objectUrl;}else if(online){source='network';video.src=current.url;}else {waitingForMedia=true;show('This film has not downloaded yet.','Reconnect to download your next videos. Available cached films will resume automatically.');for(let n=1;n<manifest.items.length;n++){const k=(index+n)%manifest.items.length;if(await cachedMedia(manifest.items[k].cacheKey,clock())){index=k;return play();}}return;}
   if(qrObject)URL.revokeObjectURL(qrObject);const qr=await get('kv','qr:'+current.qrImage);qrObject=qr?.blob?URL.createObjectURL(qr.blob):null;$('qr').src=qrObject||current.qrImage;$('qr-box').classList.remove('hidden');
   $('overlay').classList.add('hidden');lastPosition=0;lastTick=performance.now();
   if(current.demo)status('SAMPLE FILM · test content, not a broadcast');
@@ -66,7 +76,7 @@ async function play(){
 let advancing=false;
 async function next(reason='skip'){
   if(advancing)return;advancing=true;
-  try{await event(reason);if(pending){manifest=pending;pending=null;index=(index+1)%Math.max(1,manifest.items.length);await put('kv',{key:'manifest',value:manifest});await applyTheme();}else index=(index+1)%Math.max(1,manifest?.items.length||1);await play();}finally{advancing=false;}
+  try{await reportProgress(reason==='complete');await event(reason);if(pending){manifest=pending;pending=null;index=(index+1)%Math.max(1,manifest.items.length);await put('kv',{key:'manifest',value:manifest});await applyTheme();}else index=(index+1)%Math.max(1,manifest?.items.length||1);await play();}finally{advancing=false;}
 }
 async function revoked(message){
   video.pause();credential=null;manifest=null;current=null;pending=null;await clear('media');await clear('kv');await clear('events');show('TV connection needs attention.',message);$('qr-box').classList.add('hidden');
@@ -81,8 +91,8 @@ async function sync(){
     if(waitingForMedia)await play();
     for(const command of state.commands){
       if(command.id<=lastCommand){await request('/ack',{id:command.id});continue;}
-      if(command.kind==='pause'){desired=false;await tick();video.pause();show('Paused from your venue remote.','Press Play in MIXXPRO to resume.');}
-      if(command.kind==='play'){desired=true;if(!current)await refresh(true);else{await video.play();$('overlay').classList.add('hidden');lastTick=performance.now();lastPosition=video.currentTime;}}
+      if(command.kind==='pause'){desired=false;await reportProgress();video.pause();await event('pause');show('Paused from your venue remote.','Press Play in MIXXPRO to resume.');}
+      if(command.kind==='play'){desired=true;if(!current)await refresh(true);else{await video.play();$('overlay').classList.add('hidden');lastTick=performance.now();lastPosition=video.currentTime;await event('resume');}}
       if(command.kind==='next')await next();
       if(['shuffle','apply','refresh'].includes(command.kind))await refresh(true);
       lastCommand=command.id;await put('kv',{key:'lastCommand',value:lastCommand});await put('kv',{key:'desired',value:desired});await request('/ack',{id:command.id});
@@ -114,8 +124,8 @@ async function run(){
   setInterval(()=>{if(manifest&&manifest.expiresAt<=clock()){video.pause();show('Reconnect to refresh your MIXX.','This programming window has expired.');}},1000);
   setInterval(()=>{const live=promotions.filter(p=>p.starts_at<=clock()&&p.ends_at>clock());if(live.length&&Date.now()-lastPromotion>30000){const p=live[Math.floor(Date.now()/30000)%live.length];$('promo-title').textContent=p.title;$('promo-body').textContent=p.description;$('promo').classList.remove('hidden');lastPromotion=Date.now();setTimeout(()=>$('promo').classList.add('hidden'),10000);}},5000);
 }
-video.addEventListener('ended',()=>{const final=Math.max(0,Math.min(30,video.currentTime-lastPosition,(performance.now()-lastTick)/1000));event('tick',final).then(()=>next('complete')).catch(console.error);});
-video.addEventListener('error',()=>{event('error').catch(console.error);show('We couldn’t play this film.','Checking the next available video…');setTimeout(()=>next().catch(console.error),5000);});
+video.addEventListener('ended',()=>next('complete').catch(console.error));
+video.addEventListener('error',()=>{const failedPlayback=playbackId;event('error').catch(console.error);show('We couldn’t play this film.','Checking the next available video…');setTimeout(()=>{if(playbackId===failedPlayback)next().catch(console.error);},5000);});
 $('enable').onclick=async()=>{try{desired=true;await video.play();$('overlay').classList.add('hidden');lastTick=performance.now();lastPosition=video.currentTime;}catch{show('Playback is unavailable in this browser.','Use a supported browser on an HDMI-connected device.');}};
 $('fullscreen').onclick=()=>document.documentElement.requestFullscreen?.().catch(()=>{});
 $('sound').onclick=()=>{video.muted=!video.muted;$('sound').textContent=video.muted?'Enable sound':'Mute';};
