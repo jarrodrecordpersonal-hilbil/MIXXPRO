@@ -23,4 +23,4 @@ CREATE INDEX events_time ON events(occurred_at);
 CREATE INDEX events_campaign_time ON events(campaign_id,occurred_at);
 CREATE INDEX playback_context_venue ON playback_context(venue_id,world);
 CREATE INDEX playback_context_brand ON playback_context(brand_id,campaign_id);
-INSERT INTO migrations VALUES(2,unixepoch()*1000);
+INSERT INTO migrations VALUES(3,unixepoch()*1000);

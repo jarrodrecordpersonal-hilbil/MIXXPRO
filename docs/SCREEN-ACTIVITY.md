@@ -63,7 +63,7 @@ QR visits and attributed orders already live in separate relational tables keyed
 
 ## Persistence, upgrade, and scale
 
-`002_screen_activity.sql` is additive and versioned; it retains previous event rows and the append-only financial ledger. It adds venue locations, immutable-per-playback context, event source/sequence fields and query indices. Back up before any deployment migration and perform a restore check. This change does not delete historical data or activate an external data warehouse.
+`003_screen_activity.sql` is additive and versioned; it retains previous event rows and the append-only financial ledger. It adds venue locations, immutable-per-playback context, event source/sequence fields and query indices. Back up before any deployment migration and perform a restore check. This change does not delete historical data or activate an external data warehouse.
 
 The pilot keeps raw records in your application database. No automatic retention deletion was added. Define production retention, rollups, encrypted off-host backups, disaster recovery and restricted export access before rollout. This query implementation is for the single-host pilot; full 8,000-player analytics requires database sizing/load tests and a scalable warehouse/rollup architecture. It is not proven at that volume by unit/browser tests.
 
