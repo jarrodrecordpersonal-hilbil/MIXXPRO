@@ -1,34 +1,33 @@
-# MIXXPRO product requirements
+# Product rules
 
-## Venue journey
-1. Create venue.
-2. Pick one MIXX world or build My Mix.
-3. Pick a visual theme independently.
-4. Pair one or more TVs with short-lived claim codes.
-5. Select one TV, a group, or all TVs and press Play.
-6. Use Play, Pause, Next, Shuffle and Change MIXX remotely.
-7. See only real playback, scan, order and revenue data in dashboards.
+## Keep the venue experience simple
 
-## MIXX worlds
-Bourbon, Golf, Travel, Cigar, Food, Cocktails, Music, Outdoors. Admins can add worlds without a client release.
+- Choose Golf, Bourbon, Travel, Cigar, Food, Cocktails, Music & culture, or Outdoors.
+- Inside a world, optionally choose subcategories; no selection means all eligible subcategories.
+- Choose **My Mix** to combine worlds with Less / Normal / More.
+- Save a 90-minute, three-hour or six-hour rotation; API supports 30–360 minutes.
+- Choose a visual theme independently.
+- Select one TV, a group or all TVs; press Play. Returning operators can Keep Playing.
+- Shuffle changes rotation, not content preferences.
+- New eligible films enter refreshed queues without venue reprogramming.
 
-A single MIXX continuously selects eligible current content within one world. My Mix blends worlds using LESS/NORMAL/MORE preferences. Newly published eligible content automatically becomes available to rotations. Shuffle changes the rotation seed and refreshes the upcoming queue.
+The default UI is warm white, deep green, restrained accents, generous spacing and short bullet lists. No crowded broadcast-console controls. Empty states lead to a specific next action.
 
-## Plans
-- Free: sponsored programming + QR revenue share.
-- Paid: ad-free programming.
-- Premium: clean/premium content and advanced controls/analytics.
+## Plans and equipment
 
-Per-TV pricing and entitlements are server-side.
+- Free: eligible sponsor insertion and configured QR revenue sharing; default pilot allowance five TVs.
+- Ad-free: no third-party sponsor assets in the playlist.
+- Premium clean: ad-free; only content manually marked clean; premium-only assets become eligible.
+- Paid plans are priced per TV using real configured Stripe prices. No invented rate or automatic charge.
+- QR overlays and venue's own promotions are separate from third-party ads.
+- Commission defaults to zero until approved commercial terms are configured; this is not a promised revenue rate.
+- **MIXXTANK-funded hardware and professional installation require an active, approved, signed five- or ten-year agreement.** A request is not an approval. All others bring compatible equipment.
+- Use “TVs” and “equipment”; never introduce a separate hardware product name.
 
-## Hardware and installation
-MIXXTANK-funded hardware and professional installation are offered ONLY with qualifying 5-year or 10-year agreements. All other venues are self-serve and use compatible equipment they already own. Do not call hardware a Set.
+## Measurement
 
-## Commerce
-Barrel picks, venue-exclusive labels, events and venue referrals can be inserted into eligible programming and QR calls to action.
+Online status comes from recent heartbeats. Download totals come from cached media records. Playback seconds come from bounded progress reports. Scans count affirmative consented QR visits, not every page request. Orders require signed merchant webhooks; refunds append adjustments. No human dwell, viewership or insurance claims are inferred from telemetry.
 
-## Attribution
-Every actionable impression can resolve venue, TV, content, campaign and playback window. Scan sessions carry that attribution into commerce. Revenue-share ledger entries are immutable and auditable.
+## Commerce scope
 
-## Brand measurement
-Verified playback events, screen-hours, dwell estimates, scans, conversions and attributable revenue. Never present synthetic/demo values as production analytics.
+Events, barrel picks, labels and referrals have working promotion/request hooks. Actual retail fulfillment, bottle-label approval, pick allocations, referral incentive payouts and licensed merchant responsibilities are not automated in this pilot.

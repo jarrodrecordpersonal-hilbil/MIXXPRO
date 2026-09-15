@@ -1,0 +1,74 @@
+/** Player API routes. Authorization remains inside every scoped operation. */
+export async function playerRoutes(context){
+  const {req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg}=context;
+      if(method==='POST'&&path==='/api/player/pair'){
+        rateLimit(db,`pair-create:${ip}`,20,3600000);const pairing=id(),poll=token(32),credential=token(32);
+        let code;do{code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,'0');}while(db.get('SELECT id FROM pairings WHERE code=?',code));
+        db.run('DELETE FROM pairings WHERE expires_at<? AND claimed_at IS NULL',now());
+        db.run('INSERT INTO pairings(id,code,poll_hash,device_token_hash,expires_at) VALUES(?,?,?,?,?)',pairing,code,hash(poll),hash(credential),now()+600000);
+        return json(res,201,{id:pairing,code,pollToken:poll,deviceToken:credential,expiresAt:now()+600000});
+      }
+      if(method==='GET'&&path.startsWith('/api/player/pair/')){
+        const p=db.get('SELECT * FROM pairings WHERE id=?',path.split('/').at(-1));
+        if(!p||!equal(p.poll_hash,hash(req.headers.authorization?.replace(/^Bearer /,'')||'')))fail(401,'Invalid pairing request.');
+        if(!p.claimed_at&&p.expires_at<now())fail(410,'Pairing code expired.');return json(res,200,{status:p.claimed_at?'paired':'pending',tvId:p.tv_id});
+      }
+      if(method==='POST'&&path==='/api/tvs/claim'){
+        const {user,venue}=access(req,true);rateLimit(db,`claim:${user.id}`,20,900000);
+        const code=text(b.code,'Pairing code',6),name=text(b.name,'TV name',60),group=text(b.group||'','Group',40,true);
+        const tvId=transaction(()=>{
+          const p=db.get('SELECT * FROM pairings WHERE code=? AND claimed_at IS NULL AND expires_at>?',code,now());if(!p)fail(400,'That code is invalid, expired, or already used.');
+          if(tvRows(venue.id).length>=(venue.plan==='free'?config.FREE_TV_LIMIT:venue.seats))fail(409,'Your plan has no available TV seats. Update your subscription first.');
+          const tvId=id();db.run('INSERT INTO tvs(id,venue_id,name,group_name,token_hash,created_at) VALUES(?,?,?,?,?,?)',tvId,venue.id,name,group,p.device_token_hash,now());
+          db.run('UPDATE pairings SET tv_id=?,claimed_at=? WHERE id=? AND claimed_at IS NULL',tvId,now(),p.id);return tvId;
+        });audit(user.id,venue.id,'tv.paired',{tvId});return json(res,201,{tvId});
+      }
+      if(method==='PATCH'&&/^\/api\/tvs\/[^/]+$/.test(path)){
+        const {venue,user}=access(req,true),tvId=path.split('/').at(-1);const tv=db.get('SELECT * FROM tvs WHERE id=? AND venue_id=? AND revoked=0',tvId,venue.id);if(!tv)fail(404,'TV not found.');
+        if(b.revoke===true){db.run('UPDATE tvs SET revoked=1 WHERE id=?',tvId);audit(user.id,venue.id,'tv.revoked',{tvId});}
+        else db.run('UPDATE tvs SET name=?,group_name=? WHERE id=?',text(b.name||tv.name,'TV name',60),text(b.group??tv.group_name,'Group',40,true),tvId);return json(res,200,{ok:true});
+      }
+      if(method==='POST'&&path==='/api/commands'){
+        const {user,venue}=access(req,true),kind=choice(b.kind,['play','pause','next','shuffle','apply'],'command');
+        const all=tvRows(venue.id);const ids=b.ids==='all'?all.map(t=>t.id):b.ids;
+        if(!Array.isArray(ids)||!ids.length||ids.length>100)fail(400,'Select at least one TV.');
+        const selected=[...new Set(ids)];if(selected.some(t=>!all.some(x=>x.id===t)))fail(404,'One of those TVs does not belong to this venue.');
+        const mix=b.mix?mixDefinition(b.mix):null,theme=b.theme?choice(b.theme,THEMES.map(t=>t.id),'theme'):null;
+        if(kind==='apply'&&!mix&&!theme)fail(400,'Choose a MIXX or theme first.');
+        transaction(()=>{for(const tvId of selected){const tv=all.find(t=>t.id===tvId);if(kind==='shuffle'){db.run('UPDATE tvs SET rotation_seed=? WHERE id=?',crypto.getRandomValues(new Uint32Array(1))[0]%2147483647,tvId);}
+          if(kind==='apply')db.run('UPDATE tvs SET mix=?,theme=? WHERE id=?',mix?JSON.stringify(mix):(tv.mix?JSON.stringify(tv.mix):null),theme||tv.theme,tvId);
+          enqueue(tvId,kind,{});
+        }});audit(user.id,venue.id,'command.queued',{kind,count:selected.length});return json(res,200,{queued:selected.length,message:'Queued. A TV confirms receipt when it reconnects.'});
+      }
+      if(method==='GET'&&path==='/api/player/state'){
+        const {tv,venue}=device(req),current=effective(tv,venue);
+        const commands=db.all('SELECT id,kind,payload FROM commands WHERE tv_id=? AND ack_at IS NULL AND expires_at>? ORDER BY id LIMIT 100',tv.id,now()).map(c=>({...c,payload:parse(c.payload)}));
+        return json(res,200,{tvId:tv.id,venueName:venue.name,...current,accent:venue.accent,commands,serverTime:now(),promotions:db.all('SELECT id,title,description,starts_at,ends_at FROM promotions WHERE venue_id=? AND active=1 AND starts_at<=? AND ends_at>?',venue.id,now(),now())});
+      }
+      if(method==='POST'&&path==='/api/player/heartbeat'){
+        const {tv}=device(req);const seconds=integer(b.cacheSeconds??0,'Cached seconds',0,864000),bytes=integer(b.cacheBytes??0,'Cached bytes',0,100000000000);
+        db.run('UPDATE tvs SET last_seen=?,cache_seconds=?,cache_bytes=?,playing=?,current_title=? WHERE id=?',now(),seconds,bytes,b.playing===true?1:0,text(b.title||'','Title',160,true),tv.id);return json(res,200,{ok:true});
+      }
+      if(method==='POST'&&path==='/api/player/ack'){
+        const {tv}=device(req);integer(b.id,'Command ID',1,Number.MAX_SAFE_INTEGER);
+        const command=db.get('SELECT id FROM commands WHERE id=? AND tv_id=?',b.id,tv.id);if(!command)fail(404,'Command not found.');
+        transaction(()=>{db.run('UPDATE commands SET ack_at=COALESCE(ack_at,?) WHERE id=? AND tv_id=?',now(),b.id,tv.id);db.run('UPDATE tvs SET last_ack=MAX(last_ack,?) WHERE id=?',b.id,tv.id);});return json(res,200,{ok:true});
+      }
+      if(method==='GET'&&path==='/api/player/manifest'){
+        const {tv,venue}=device(req);rateLimit(db,`manifest:${tv.id}`,40,60000);return json(res,200,manifest(tv,venue));
+      }
+      if(method==='POST'&&path==='/api/player/events'){
+        const {tv}=device(req);if(!Array.isArray(b.events)||b.events.length>100)fail(400,'Send at most 100 events.');const accepted=[],rejected=[];
+        transaction(()=>{for(const e of b.events){
+          if(!e||typeof e.id!=='string'||e.id.length>80){rejected.push({id:e?.id,reason:'invalid_id'});continue;}
+          if(db.get('SELECT id FROM events WHERE id=?',e.id)){accepted.push(e.id);continue;}
+          const m=db.get('SELECT * FROM manifests WHERE id=? AND tv_id=?',e.manifestId||'',tv.id),issued=m?parse(m.payload):null;
+          const item=issued?.items.find(x=>x.contentId===e.contentId&&(x.campaignId||null)===(e.campaignId||null));
+          const goodTime=Number.isSafeInteger(e.occurredAt)&&e.occurredAt>=m?.created_at-5000&&e.occurredAt<=m?.expires_at&&e.occurredAt<=now()+300000&&e.occurredAt>=now()-7*86400000;
+          if(!item||!goodTime||!['tick','complete','error','start','skip'].includes(e.kind)||typeof e.playbackId!=='string'||e.playbackId.length>80||!Number.isFinite(e.seconds)||e.seconds<0||e.seconds>30){rejected.push({id:e.id,reason:'invalid_context'});continue;}
+          const used=db.get('SELECT COALESCE(SUM(seconds),0) seconds FROM events WHERE tv_id=? AND playback_id=?',tv.id,e.playbackId).seconds;
+          const seconds=e.kind==='tick'?Math.max(0,Math.min(e.seconds,item.duration-used)):0;
+          db.run('INSERT INTO events VALUES(?,?,?,?,?,?,?,?,?,?)',e.id,tv.id,m.id,item.contentId,item.campaignId,e.playbackId,e.kind,seconds,e.occurredAt,now());accepted.push(e.id);
+        }});return json(res,200,{accepted,rejected});
+      }
+}

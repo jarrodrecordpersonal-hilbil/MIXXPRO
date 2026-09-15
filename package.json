@@ -1,1 +1,12 @@
-{"name":"mixxpro","private":false,"version":"0.1.0","packageManager":"pnpm@10.15.0","scripts":{"dev":"pnpm --filter @mixxpro/web dev","build":"pnpm -r build","typecheck":"pnpm -r typecheck","test":"pnpm -r test"},"devDependencies":{"typescript":"^5.9.2"}}
+{
+  "name": "mixxpro", "version": "0.2.0", "private": true, "type": "module",
+  "engines": {"node": ">=22.16.0"},
+  "scripts": {
+    "start": "node --experimental-sqlite --env-file-if-exists=.env apps/server/main.mjs",
+    "dev": "node --experimental-sqlite --env-file-if-exists=.env --watch apps/server/main.mjs",
+    "test": "node --experimental-sqlite --test tests/*.test.mjs",
+    "check": "node scripts/check.mjs", "build": "npm run check",
+    "admin": "node --experimental-sqlite --env-file-if-exists=.env scripts/admin.mjs",
+    "backup": "node --experimental-sqlite --env-file-if-exists=.env scripts/backup.mjs"
+  }
+}
