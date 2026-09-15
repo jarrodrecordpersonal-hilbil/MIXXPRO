@@ -1,0 +1,1 @@
+{"name":"mixxpro","private":false,"version":"0.1.0","packageManager":"pnpm@10.15.0","scripts":{"dev":"pnpm --filter @mixxpro/web dev","build":"pnpm -r build","typecheck":"pnpm -r typecheck","test":"pnpm -r test"},"devDependencies":{"typescript":"^5.9.2"}}
