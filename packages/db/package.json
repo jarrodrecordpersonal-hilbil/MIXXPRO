@@ -1,0 +1,1 @@
+{"name":"@mixxpro/db","version":"0.1.0","type":"module","exports":"./src/schema.ts","scripts":{"build":"tsc -p tsconfig.json","typecheck":"tsc -p tsconfig.json --noEmit","test":"node --test"},"dependencies":{"drizzle-orm":"^0.44.5","postgres":"^3.4.7"},"devDependencies":{"typescript":"^5.9.2"}}
