@@ -30,6 +30,15 @@ def nav(page, name):
     target.click()
     expect(target).to_have_attribute('aria-current', 'page')
 
+def wait(page, expression, timeout=30000):
+    """Poll via DevTools evaluation; do not weaken the app's no-unsafe-eval CSP."""
+    deadline = time.monotonic() + timeout / 1000
+    while time.monotonic() < deadline:
+        if page.evaluate(expression):
+            return
+        page.wait_for_timeout(100)
+    raise AssertionError('Timed out waiting for browser condition: ' + expression)
+
 def records(page, store):
     return page.evaluate("async store => {const {all} = await import('/player/offline.mjs'); return (await all(store)).length;}", store)
 
@@ -110,7 +119,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     player = player_context.pages[0]
                     player.on('pageerror', lambda error: errors.append(str(error)))
                     player.goto(BASE + '/player/')
-                    player.wait_for_function("/^\\d{6}$/.test(document.getElementById('pair-code').textContent)")
+                    wait(player, "/^\\d{6}$/.test(document.getElementById('pair-code').textContent)")
                     code = player.locator('#pair-code').inner_text()
                     nav(page, 'tvs')
                     page.locator('[data-action="pair"]').first.click()
@@ -120,19 +129,19 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     with page.expect_response(lambda r: r.url.endswith('/api/tvs/claim')):
                         page.locator('dialog button[type=submit]').click()
                     expect(page.locator('#dialog')).not_to_be_visible()
-                    player.wait_for_function("document.getElementById('video').currentTime>.2&&!document.getElementById('video').paused", timeout=25000)
-                    player.wait_for_function("async()=>{const {all}=await import('/player/offline.mjs');return (await all('media')).some(m=>m.blob instanceof Blob&&m.blob.size>0);}", timeout=20000)
+                    wait(player, "document.getElementById('video').currentTime>.2&&!document.getElementById('video').paused", timeout=25000)
+                    wait(player, "async()=>{const {all}=await import('/player/offline.mjs');return (await all('media')).some(m=>m.blob instanceof Blob&&m.blob.size>0);}", timeout=20000)
                     player.evaluate('navigator.serviceWorker.ready')
-                    player.wait_for_function('navigator.serviceWorker.controller !== null')
+                    wait(player, 'navigator.serviceWorker.controller !== null')
                     passed('Six-digit UI pairing starts actual MP4 playback and native IndexedDB Blob caching')
 
                     page.locator('[data-action="tv-remote"]').first.click()
                     page.locator('[data-action="quick-command"][data-kind="pause"]').click()
-                    player.wait_for_function("document.getElementById('video').paused", timeout=12000)
+                    wait(player, "document.getElementById('video').paused", timeout=12000)
                     expect(player.locator('#overlay-title')).to_have_text('Paused from your venue remote.')
                     page.locator('[data-action="tv-remote"]').first.click()
                     page.locator('[data-action="quick-command"][data-kind="play"]').click()
-                    player.wait_for_function("!document.getElementById('video').paused", timeout=12000)
+                    wait(player, "!document.getElementById('video').paused", timeout=12000)
                     passed('Cloud pause and play control the native video element')
                     player.screenshot(path=str(OUT / 'native-player.png'))
                     credential = player.evaluate("async()=>{const {get}=await import('/player/offline.mjs');return (await get('kv','credential')).value;}")
@@ -149,14 +158,14 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     player = player_context.pages[0]
                     player.on('pageerror', lambda error: errors.append(str(error)))
                     player.goto(BASE + '/player/', wait_until='domcontentloaded')
-                    player.wait_for_function("document.getElementById('video').currentTime>.2&&!document.getElementById('video').paused", timeout=20000)
+                    wait(player, "document.getElementById('video').currentTime>.2&&!document.getElementById('video').paused", timeout=20000)
                     restored = player.evaluate("async()=>{const {get}=await import('/player/offline.mjs');return (await get('kv','credential')).value;}")
                     assert restored == credential
                     assert records(player, 'media') > 0
                     assert records(player, 'events') >= queued
                     passed('A persistent browser profile restarts offline with its pairing, cached media and outbox intact')
                     player_context.set_offline(False)
-                    player.wait_for_function("async()=>{const {all}=await import('/player/offline.mjs');return (await all('events')).length===0;}", timeout=20000)
+                    wait(player, "async()=>{const {all}=await import('/player/offline.mjs');return (await all('events')).length===0;}", timeout=20000)
                     saved = owner.request.get(BASE + '/api/venue', headers=headers).json()
                     assert saved['metrics']['seconds'] > 0
                     assert saved['metrics']['dwell'] is None
