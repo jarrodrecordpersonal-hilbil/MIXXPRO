@@ -31,11 +31,11 @@ if(!['/music','/setup'].includes(location.pathname)){
   root.addEventListener('change',async e=>{if(e.target.id==='activation-venue'){venueId=e.target.value;localStorage.setItem('mixx-venue',venueId);try{await music();}catch(error){status(error.message,true);}}});
   root.addEventListener('click',async e=>{const target=e.target.closest('button');if(!target||busy)return;if(target.dataset.review){review(target.dataset.review);return;}const id=target.dataset.cancel||target.dataset.decline;if(!id)return;if(!confirm(target.dataset.cancel?'Cancel this setup request? External provider subscriptions are not cancelled here.':'Decline this music setup request?'))return;busy=true;try{if(target.dataset.cancel){await api('/music/'+encodeURIComponent(id)+'/cancel',{});await music();status('Request cancelled. Existing provider subscriptions are unchanged.');}else{await api('/admin/music/review',{id,decision:'decline'});await setup();status('Review saved.');}}catch(error){status(error.message,true);}finally{busy=false;}});
   root.addEventListener('submit',async e=>{e.preventDefault();if(busy)return;const form=e.target,button=form.querySelector('button[type=submit]'),data=new FormData(form);busy=true;button.disabled=true;status('Checking…');try{
-    if(form.id==='bunny-check'){
+    if(form.getAttribute('id')==='bunny-check'){
       const result=await api('/admin/bunny-check',{resolution:Number(data.get('resolution'))});document.getElementById('bunny-result').innerHTML=`<ul class="activation-checks">${result.checks.map(c=>`<li>${badge(c.status.toUpperCase(),c.status)}<div><b>${esc(c.label)}</b><p>${esc(c.detail)}</p></div></li>`).join('')}</ul><div class="alert">${result.readyForPlayerTest?'Server checks passed. Next, test an actual player download and video playback.':'Complete the items above, then run this check again.'} This is not proof of actual TV playback.</div>`;status('Connection check finished.');
-    }else if(form.id==='music-request'){
+    }else if(form.getAttribute('id')==='music-request'){
       await api('/music',{payer:data.get('payer'),zones:Number(data.get('zones')),sponsorName:data.get('sponsorName'),confirm:data.has('confirm')});await music();status('Request saved. No payment taken and no provider service activated.');
-    }else if(form.id==='music-review-form'){
+    }else if(form.getAttribute('id')==='music-review-form'){
       const values=Object.fromEntries(data);await api('/admin/music/review',{...values,decision:'approve',confirm:data.has('confirm'),validUntil:Date.parse(values.validUntil+'T23:59:59Z')});await setup();status('Payer/provider review saved. Connect and test the provider separately.');
     }
   }catch(error){status(error.message,true);}finally{busy=false;if(button.isConnected)button.disabled=false;}});
