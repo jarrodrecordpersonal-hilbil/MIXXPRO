@@ -6,6 +6,7 @@
     "dev": "node --experimental-sqlite --env-file-if-exists=.env --watch apps/server/main.mjs",
     "test": "node --experimental-sqlite --test tests/*.test.mjs",
     "check": "node scripts/check.mjs", "build": "npm run check",
+    "doctor": "node --env-file-if-exists=.env scripts/doctor.mjs",
     "admin": "node --experimental-sqlite --env-file-if-exists=.env scripts/admin.mjs",
     "backup": "node --experimental-sqlite --env-file-if-exists=.env scripts/backup.mjs"
   }
