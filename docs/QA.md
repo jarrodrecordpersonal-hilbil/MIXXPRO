@@ -1,48 +1,75 @@
 # MIXXPRO v0.2 · Quality report
 
-Validated in the authoring environment on 2026-09-15. This is evidence for a runnable pilot, not a production security certification or live-provider acceptance.
+Updated 2026-09-15. This is evidence for a runnable pilot, not a production security certification, live-provider acceptance or physical-TV approval.
 
-## Completed local checks
+## Latest independently executed CI checks
 
-- **41 / 41 automated Node tests passed.** Real HTTP service and in-memory SQLite, plus deterministic domain/security/signing tests. No runtime dependencies installed.
-- **24 JavaScript modules passed syntax checks.** Customer-facing UI terminology check passed.
-- **18 / 18 browser workflow/layout checks passed.** Real dashboard scripts, actual HTTP API, persisted venue records; desktop and 390px-wide layouts. No uncaught page errors.
-- **12 / 12 player checks passed.** Actual HTMLVideoElement decoding a downloaded six-second MP4; cloud commands, simulated HTTP loss/reconnect and expired-window protection. No uncaught player errors.
-- **Database snapshot restore inspection passed.** `npm run backup` produced a consistent SQLite snapshot; `PRAGMA integrity_check` returned `ok` when opened separately.
-- QR matrices were compared against an independent QR implementation for byte-mode, level-L versions 1–5 with the same mask. No matrix-cell differences were found. A deterministic matrix regression is in the Node suite.
+GitHub Actions run **35024203372** tested PR head `ce3fe3c1901e4dfcd974979ea8aa8ca9ba8179f1` via merge commit `a896426e1c7154c37fcd5c96e06716bd70582ea9`.
+
+- **49 / 49 Node tests passed on both Node 22 and Node 24.** These exercise the HTTP service, SQLite, domain/security/signing rules and the new secret-safe launch diagnostics.
+- **26 JavaScript modules passed syntax checks.** Customer-facing terminology checks passed.
+- **10 / 10 native-browser acceptance checkpoints passed.** This run used real Chromium navigation, actual HTTP requests, native LocalStorage/IndexedDB and a real service worker. No fetch bridge or in-memory storage substitute was used.
+- **No uncaught browser JavaScript errors were recorded.** Eight venue pages had no horizontal overflow at 390px width.
+- The downloaded tracked-source ZIP matched its published SHA-256 checksum.
+
+Evidence: [CI run](https://github.com/jarrodrecordpersonal-hilbil/MIXXPRO/actions/runs/35024203372) and [retained acceptance summary](evidence/native-browser-ce3fe3c.json). CI artifacts include Node logs, native browser screenshots and the exact tested source archive; hosted artifacts have a 14-day retention period.
+
+## What the native browser test proved
+
+1. Signup created a real server session and venue.
+2. Weighted My Mix and an independent visual theme persisted through browser requests.
+3. Six-digit TV pairing started actual MP4 decoding and stored a downloaded video Blob in native IndexedDB.
+4. Cloud Pause and Play controlled the video element.
+5. Downloaded media continued during browser-emulated network loss while telemetry accumulated in IndexedDB.
+6. A persistent Chromium profile closed and restarted offline; its pairing credential, cached media and outbox survived, and video resumed through the service-worker shell.
+7. Reconnection drained the outbox into server playback analytics. Human dwell remained unmeasured.
+8. All eight venue pages fit a 390px viewport without horizontal overflow.
+9. An expired persisted playback lease stopped video after offline reload.
+10. The complete flow recorded no uncaught JavaScript errors.
+
+The test starts its own loopback-only server and disposable database/profile. It uses explicitly labelled six-second sample media, not a live Bunny account or real venue audience. The test's expired-lease case deliberately changes a disposable fixture record; it does not demonstrate DRM or tamper resistance. The application's Content Security Policy was not weakened to run the test.
+
+**A Linux Chromium profile restart is not a physical-TV power-cycle certification.** Device codecs, operating systems, storage eviction, extended outages and unattended startup still require qualification.
+
+## Earlier local checks
+
+The initial runnable pilot also recorded 18 browser workflow/layout checks, 12 player checks, a SQLite snapshot restore inspection and an independent QR-matrix comparison. These are historical results, not additional native-browser checks in the latest CI run.
+
+The earlier authoring-browser harness mounted actual code and bridged requests through httpx because direct navigation was restricted. It substituted LocalStorage/IndexedDB. Those earlier results did not prove native restart durability; the separate native CI flow above closes that gap for the specific tested Chromium environment only.
 
 ## Automated coverage
 
-- Single-world and weighted multi-world selection; exact requested queue duration; deterministic shuffle; topic restrictions.
-- Ad-free/premium filtering; clean and public-venue rights checks; expired/draft media exclusion.
-- Five-/ten-year signed-agreement eligibility; timezone and overnight schedules.
-- Authentication, tenant isolation, read-only membership, admin/brand scopes, CSRF and Origin rejection.
-- One-time pairing, actual heartbeat counters, TV-seat limits, command acknowledgement and credential revocation.
-- Stable issued manifests, context-bound playback events, deduplication and duration bounds.
-- Consent before scans, webhook signatures, idempotent order ingestion, cumulative refunds and append-only ledger enforcement.
-- Subscription entitlements reconciled from a mocked authoritative Stripe response, never from the checkout success page.
-- Bunny URL token and R2 presigning structure; QR encoding; integer-money commission arithmetic.
+- Single-world and weighted selections; requested rotation length; shuffle and topic restrictions.
+- Ad-free/premium filtering; clean approval; confirmed display rights and expiry.
+- Five-/ten-year qualifying executed-agreement eligibility; timezone-aware and overnight scheduling.
+- Sessions, tenant isolation, membership roles, admin/brand scope, CSRF and Origin checks.
+- Single-use pairing, subscription seats, revocation, remote acknowledgements and heartbeat accounting.
+- Context-bound playback records, duplicate-event handling and duration bounds.
+- Consent before scans, signed order notifications, cumulative refunds and append-only commission accounting.
+- Authoritative subscription reconciliation with mocked Stripe responses, never a grant from a checkout success page.
+- Bunny/R2 signing helpers, QR encoding, integer-money calculations and secret-safe configuration diagnostics.
 
-## Browser and player test method
+## Still untested or incomplete
 
-The authoring browser cannot navigate to a served origin. Tests mount the actual application HTML, stylesheet and scripts in Playwright, then bridge fetch requests to the real running HTTP API through httpx. The venue harness substitutes LocalStorage. The player harness substitutes IndexedDB with test memory while exercising the real cache controller, actual MP4 bytes, actual browser video decoding, remote queue and telemetry ingestion.
-
-The player continues downloaded Blob playback during simulated HTTP loss, queues unsent events, and reports progress after reconnect. Subscription-seat denial pauses playback without deleting the pairing credential; restoring access resumes that TV without re-pairing. Expired manifest windows pause playback. These tests **do not** prove durability across a real browser restart or hardware power loss.
-
-The screenshot harness suppresses transient toast overlays only during image capture so the underlying UI can be inspected. Screenshots are rendered from the application, not generated design mockups.
-
-## Not tested or not implemented
-
-- Native IndexedDB durability, storage eviction, service-worker offline navigation and reboots on a real HTTPS TV device.
-- Real Bunny/R2 credentials, live CDN CORS/signatures, actual Stripe checkout/portal or real merchant-to-order attribution.
-- Physical smart-TV or HDMI hardware qualification, native TV apps, casting, kiosk recovery and watchdogs.
-- Docker/Compose execution, public DNS/TLS deployment, multi-node storage, production load/security/accessibility audits.
-- Automated money transfers, tax/KYC onboarding, fulfillment, insurance coverage, legal contract execution or human dwell measurement.
+- Real Bunny/R2 credentials, live CDN CORS/signatures and real customer media.
+- Actual Stripe checkout/portal, merchant attribution and financial reconciliation.
+- TV/HDMI hardware, native TV apps, casting, kiosk recovery, physical power cycles and watchdogs.
+- Storage pressure/eviction, different browsers, long outages and actual deployed HTTPS-device durability.
+- Docker/Compose execution, DNS/TLS hosting, multi-node storage and independent security/load/accessibility audits.
+- Automated money transfers, tax/KYC, fulfillment, contract execution, equipment protection/insurance and human dwell measurement.
 
 ## Reproduce
 
-Run `npm run check` and `npm test` with Node 22.16+.
+```sh
+npm run check
+npm test
+npm run doctor
+# Optional isolated native browser acceptance; requires Playwright/Chromium:
+python -m pip install playwright==1.57.0
+python -m playwright install chromium
+python tests/native_browser.py
+```
 
-Optional browser QA requires Python, Playwright, Chromium and httpx. Start an isolated test server with `DEMO_MODE=true`, `APP_ORIGIN=http://127.0.0.1:3000`, and a disposable `DB_PATH`. Set `TEST_ORIGIN` and `TEST_DB` to match, then run `python tests/ui_harness.py` and `python tests/player_harness.py`. The harnesses create test accounts and the player harness promotes only its own disposable test account in that test database. Never point them at production or customer data.
+`native_browser.py` owns and cleans up its disposable local fixture. Do not repoint it at production or customer data. The older `ui_harness.py` and `player_harness.py` additionally require httpx and their documented isolated test-server settings.
 
-GitHub Actions configuration is included for Node 22 and 24. Remote CI results must be checked on the actual commit; the local results above are not a claim that remote CI has already run.
+The launch checker lists configuration requirements without printing secret values. Its OK status means configuration is present and structurally acceptable, not that a provider was contacted or production launch was approved. See [Launch check](LAUNCH-CHECK.md).

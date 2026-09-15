@@ -2,7 +2,7 @@
 
 **Choose your MIXX → choose your TVs → play.**
 
-A runnable, database-backed pilot, not a static dashboard. This replaces the earlier unconnected Next.js/player scaffold with a dependency-free Node.js service, a browser venue app and an HTML5 TV player. It has been locally tested; it is **not a live deployed service or certified smart-TV app**.
+A runnable, database-backed pilot, not a static dashboard. This replaces the earlier unconnected Next.js/player scaffold with a dependency-free Node.js service, a browser venue app and an HTML5 TV player. It has passed automated and native-browser tests; it is **not a live deployed service or certified smart-TV app**.
 
 ## Run it
 
@@ -32,6 +32,7 @@ For the explicitly labelled six-second sample film, set `DEMO_MODE=true` locally
 - Venue events, barrel-pick/exclusive-label promotion hooks, venue referral attribution.
 - Scoped brand reports and admin operations. No invented revenue, online TVs, cached hours or audience dwell.
 - Five- or ten-year installation request/approval workflow. No subsidy without a qualifying signed, approved, active agreement.
+- A secret-safe launch checker and retained CI logs/source archives.
 
 ## What is not complete or live
 
@@ -48,9 +49,10 @@ For the explicitly labelled six-second sample film, set `DEMO_MODE=true` locally
 ```sh
 npm run check
 npm test
+npm run doctor
 ```
 
-See [QA report](docs/QA.md) for exact outcomes and limitations. Browser harnesses under `tests/` use Playwright and httpx as optional developer tools; they are not runtime dependencies.
+The latest verified application run passed **49 Node tests on Node 22 and 24**, **26 module syntax checks**, and **10 native-browser acceptance checkpoints**, including an offline persistent-profile restart. See the [QA report](docs/QA.md) for the exact tested commit, retained evidence and limitations. Optional native browser checks run with `python tests/native_browser.py`; Playwright is a developer tool, not a runtime dependency.
 
 ## Operations
 
@@ -62,6 +64,7 @@ npm run backup
 
 Keep generated admin passwords private. Set `MIXX_ADMIN_PASSWORD` through your secret manager to choose a password; do not put it in public shell scripts or GitHub.
 
+- [One-command launch check](docs/LAUNCH-CHECK.md)
 - [Deployment and launch checklist](docs/DEPLOYMENT.md)
 - [Bunny Stream and R2 setup](docs/MEDIA_SETUP.md)
 - [Architecture and security boundaries](docs/ARCHITECTURE.md)

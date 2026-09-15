@@ -1,0 +1,29 @@
+{
+  "date": "2026-09-15",
+  "repository": "jarrodrecordpersonal-hilbil/MIXXPRO",
+  "workflowRunId": 35024203372,
+  "headCommit": "ce3fe3c1901e4dfcd974979ea8aa8ca9ba8179f1",
+  "testedMergeCommit": "a896426e1c7154c37fcd5c96e06716bd70582ea9",
+  "nodeTests": {"22": {"passed": 49, "failed": 0}, "24": {"passed": 49, "failed": 0}},
+  "syntaxCheckedModules": 26,
+  "nativeBrowser": {
+    "checks": [
+      "Browser signup creates a real server session and venue",
+      "Weighted My Mix and independent theme persist through real browser requests",
+      "Six-digit UI pairing starts actual MP4 playback and native IndexedDB Blob caching",
+      "Cloud pause and play control the native video element",
+      "Downloaded media continues offline and telemetry persists in real IndexedDB",
+      "A persistent browser profile restarts offline with its pairing, cached media and outbox intact",
+      "Reconnection drains the outbox into device-reported playback analytics, not human dwell",
+      "Eight real venue pages have no horizontal overflow at 390px",
+      "An expired persisted playback lease stops offline video after reload",
+      "No uncaught JavaScript errors during the native acceptance flow"
+    ],
+    "errors": [],
+    "method": "Real Chromium navigation/HTTP, native IndexedDB and service-worker caching, browser offline emulation, persistent-profile restart. Isolated demo media only.",
+    "liveProvidersTested": false,
+    "physicalTvTested": false,
+    "passed": true,
+    "count": 10
+  }
+}
