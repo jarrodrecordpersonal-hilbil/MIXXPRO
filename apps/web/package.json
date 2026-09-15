@@ -1,0 +1,1 @@
+{"name":"@mixxpro/web","version":"0.1.0","private":true,"scripts":{"dev":"next dev","build":"next build","typecheck":"tsc --noEmit","test":"node --test"},"dependencies":{"next":"^15.5.2","react":"^19.1.1","react-dom":"^19.1.1","@mixxpro/domain":"workspace:*"},"devDependencies":{"@types/node":"^24.3.0","@types/react":"^19.1.12","@types/react-dom":"^19.1.9","typescript":"^5.9.2"}}

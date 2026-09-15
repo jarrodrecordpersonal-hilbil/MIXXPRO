@@ -1,0 +1,1 @@
+export default function Page(){return <><h1>MIXXTANK Admin</h1><p>Content, campaigns, venues, TV health and programming rules.</p><div className="grid">{['Content library','MIXX rules','Campaigns','Venue health','TV health','Promotions','Entitlements','Audit log'].map(x=><div className="card" key={x}><h2>{x}</h2><button className="btn dark">Open</button></div>)}</div></>}
