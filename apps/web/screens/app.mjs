@@ -6,7 +6,7 @@ const duration=value=>`${Number(value||0).toLocaleString('en-US',{maximumFractio
 let session,venueId='',scope='venue',options,report,filters={},busy=false,rollingWindow=true;
 async function api(path,body,method='GET') {
   const r=await fetch('/api'+path,{method,headers:{'X-Venue-Id':venueId,'X-CSRF-Token':session?.csrf||'',...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});
-  const data=await r.json();if(!r.ok)throw new Error(data.error||'Unable to load screen activity.');return data;
+  const data=await r.json();if(!r.ok)throw new Error(data.error||'Unable to load MIXDATA.');return data;
 }
 function message(text,error=false){const el=$('#toast');el.textContent=text;el.className='show'+(error?' error':'');clearTimeout(message.timer);message.timer=setTimeout(()=>el.className='',6500);}
 function query(extra={}) {return new URLSearchParams({scope,...filters,...extra}).toString();}
@@ -22,8 +22,8 @@ function rowHtml(row) {return `<tr><td><b>${h(row.title)}</b><small>${row.demo?'
 function render() {
   const summary=report.summary,l=options.location;
   const venueChoices=[['','All venues'],...options.venues.map(v=>[v.id,v.name])];
-  $('#app').innerHTML=`<div class="activity-bar"><a class="wordmark" href="/"><img src="/icon.svg" alt="">MIXX<span>PRO</span></a><a class="btn secondary" href="/">← Back to venue</a></div>
-    <header><div class="eyebrow">YOUR NETWORK, IN FOCUS</div><h1>Every screen has a story.</h1><p>See what played, where it played, and how many seconds the player reported.</p><p class="summary-note">No estimated eyeballs. No invented dwell time. This is your own screen-playback record.</p></header>
+  $('#app').innerHTML=`<div class="activity-bar"><a class="wordmark" href="/screens" aria-label="MIXDATA"><img src="/icon.svg" alt="">MIX<span>DATA</span></a><a class="btn secondary" href="/">← Back to venue</a></div>
+    <header><div class="eyebrow">MIXDATA · SCREEN ANALYTICS</div><h1>Every screen has a story.</h1><p>See what played, where it played, and how many seconds the player reported.</p><p class="summary-note">No estimated eyeballs. No invented dwell time. This is your own screen-playback record.</p></header>
     <div class="scopes">${session.user.role==='admin'?`<button class="btn secondary ${scope==='network'?'active':''}" data-scope="network">Whole network</button>`:''}${session.venues.length?`<button class="btn secondary ${scope==='venue'?'active':''}" data-scope="venue">My venue</button>`:''}${session.user.role==='brand'?`<button class="btn secondary ${scope==='brand'?'active':''}" data-scope="brand">My brand campaigns</button>`:''}</div>
     ${scope==='venue'?`<div class="location-label"><p><b>${h(options.venues[0]?.name||'My venue')}</b> · ${l?[l.city,l.region,l.country].map(h).join(', '):'Add a venue location for future screen reports.'}</p>${options.canEditLocation?'<button class="btn ghost small" data-action="location">Edit venue location</button>':''}</div>`:''}
     <section class="grid cols4"><div class="panel metric"><span class="metric-label">REPORTED SCREEN-HOURS</span><b class="metric-value">${(summary.reportedSeconds/3600).toLocaleString('en-US',{maximumFractionDigits:2})}</b><small>${duration(summary.reportedSeconds)} recorded</small></div>
@@ -59,7 +59,7 @@ function csv(){
   const lines=[['Playback ID','Venue ID','TV ID','Venue','TV','Video ID','Video','World','Campaign ID','Campaign','City','Region','Country','First report UTC','Last report UTC','Reported seconds','Programmed seconds','Outcome','Cached seconds','Network seconds','Delayed events'],
     ...report.rows.map(r=>[r.playbackId,r.venueId,r.tvId,r.venueName,r.tvName,r.contentId,r.title,r.world,r.campaignId,r.campaignName,r.location?.city,r.location?.region,r.location?.country,when(r.firstEventAt),when(r.lastEventAt),r.reportedSeconds,r.plannedSeconds,r.outcome,r.cachedSeconds,r.networkSeconds,r.delayedEvents])];
   const url=URL.createObjectURL(new Blob([lines.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
-  const a=document.createElement('a');a.href=url;a.download=`MIXXPRO-screen-activity-page-${Math.floor(report.offset/report.limit)+1}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const a=document.createElement('a');a.href=url;a.download=`MIXDATA-screen-activity-page-${Math.floor(report.offset/report.limit)+1}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 document.addEventListener('click',async event=>{
   const b=event.target.closest('button[data-action],button[data-scope]');if(!b||busy||b.disabled)return;
@@ -93,4 +93,4 @@ document.addEventListener('submit',async event=>{
 async function start(){session=await api('/session');venueId=localStorage.getItem('mixx-venue')||'';
   if(!session.venues.some(v=>v.id===venueId))venueId=session.venues[0]?.id||'';
   scope=session.user.role==='admin'?'network':session.user.role==='brand'?'brand':'venue';await load();}
-start().catch(error=>{$('#app').innerHTML=`<div class="activity-error"><h2>Screen activity is unavailable.</h2><p>${h(error.message)}</p><a class="btn secondary section" href="/">Return to sign in</a></div>`;});
+start().catch(error=>{$('#app').innerHTML=`<div class="activity-error"><h2>MIXDATA is unavailable.</h2><p>${h(error.message)}</p><a class="btn secondary section" href="/">Return to sign in</a></div>`;});
