@@ -27,7 +27,7 @@ def screen_checks(owner, page, player, base, headers, output, passed):
         assert r.status==200,r.text()
         if r.json()['summary']['reportedSeconds']>0:
             break
-        page.wait_for_timeout(250)
+        page.wait_for_timeout(1000)
     else:
         raise AssertionError('No located playback progress received from the player')
     page.locator('#filters [name="city"]').fill('Springfield')

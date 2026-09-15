@@ -3,7 +3,7 @@ const h=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 const DAY=86400000,date=value=>new Date(value).toISOString().slice(0,10);
 const when=value=>value?new Date(value).toISOString().replace('T',' ').replace(/\.\d+Z$/,' UTC'):'Not reported';
 const duration=value=>`${Number(value||0).toLocaleString('en-US',{maximumFractionDigits:1})} sec`;
-let session,venueId='',scope='venue',options,report,filters={},busy=false;
+let session,venueId='',scope='venue',options,report,filters={},busy=false,rollingWindow=true;
 async function api(path,body,method='GET') {
   const r=await fetch('/api'+path,{method,headers:{'X-Venue-Id':venueId,'X-CSRF-Token':session?.csrf||'',...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});
   const data=await r.json();if(!r.ok)throw new Error(data.error||'Unable to load screen activity.');return data;
@@ -44,7 +44,7 @@ function render() {
     <section class="privacy-note"><h3>Clear about what the data means.</h3><ul class="bullets"><li>A screen report is not proof that a person watched, nor that the physical TV panel was powered on.</li><li>Reported seconds exclude time the player did not report as playing. “Ended” does not certify uninterrupted attention or a full human view.</li><li>Venue location is entered by staff. Old records without a location remain unknown; editing a venue does not rewrite its history.</li><li>Offline reports arrive later. Cache/network source is not a Bunny bandwidth bill. QR visits and orders remain separately attributed to venue, screen, content, and campaign—not assumed human viewing.</li></ul></section>`;
 }
 async function load(reset=true){
-  if(reset){delete filters.asOf;delete filters.offset;}
+  if(reset){delete filters.asOf;delete filters.offset;if(rollingWindow){delete filters.from;delete filters.to;}}
   options=await api('/screen-activity/options?'+query());
   report=await api('/screen-activity?'+query());
   filters.asOf=String(report.asOf);filters.from=String(report.from);filters.to=String(report.to);
@@ -67,7 +67,7 @@ document.addEventListener('click',async event=>{
   if(b.dataset.action==='location'){editLocation();return;}
   if(b.dataset.action==='export'){csv();return;}
   busy=true;b.disabled=true;try{
-    if(b.dataset.scope){scope=b.dataset.scope;filters={};await load();}
+    if(b.dataset.scope){scope=b.dataset.scope;filters={};rollingWindow=true;await load();}
     else if(b.dataset.action==='next'){filters.offset=String(report.offset+report.limit);await load(false);}
     else if(b.dataset.action==='previous'){filters.offset=String(Math.max(0,report.offset-report.limit));await load(false);}
     else await load();
@@ -86,7 +86,7 @@ document.addEventListener('submit',async event=>{
     if(form.id==='location-form'){const r=await api('/venue/location',values,'PATCH');$('#location-dialog').close();message(r.message);await load();}
     else{const from=Date.parse(values.start+'T00:00:00Z'),to=Date.parse(values.end+'T00:00:00Z')+DAY;
       if(!Number.isFinite(from)||!Number.isFinite(to)||from>=to||to-from>31*DAY)throw Error('Choose a valid window of 31 days or less.');
-      const {start,end,...other}=values;filters=Object.fromEntries(Object.entries({...other,from:String(from),to:String(to)}).filter(([,v])=>v));await load();}
+      const {start,end,...other}=values;rollingWindow=false;filters=Object.fromEntries(Object.entries({...other,from:String(from),to:String(to)}).filter(([,v])=>v));await load();}
   }catch(error){const target=form.querySelector('.form-error');if(target)target.textContent=error.message;message(error.message,true);}
   finally{busy=false;if(button.isConnected)button.disabled=false;}
 });

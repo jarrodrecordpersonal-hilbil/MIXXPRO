@@ -76,7 +76,14 @@ export async function screenActivityRoutes(ctx) {
       JOIN events e ON e.tv_id=t.id JOIN campaigns c ON c.id=e.campaign_id WHERE c.brand_id=? ORDER BY v.name`,scope.user.brand_id);
     else venues=db.all('SELECT id,name FROM venues WHERE id=?',scope.venueId);
     const chosen=ctx.url.searchParams.get('venueId')||scope.venueId;
-    const tvs=chosen&&venues.some(v=>v.id===chosen)?db.all('SELECT id,name,revoked FROM tvs WHERE venue_id=? ORDER BY name',chosen):[];
+    let tvs=[];
+    if(chosen&&venues.some(v=>v.id===chosen)){
+      tvs=scope.scope==='brand'?db.all(`SELECT DISTINCT t.id,t.name,t.revoked FROM tvs t
+        JOIN events e ON e.tv_id=t.id JOIN campaigns campaign ON campaign.id=e.campaign_id
+        LEFT JOIN playback_context p ON p.tv_id=e.tv_id AND p.playback_id=e.playback_id
+        WHERE t.venue_id=? AND campaign.brand_id=? AND (p.brand_id IS NULL OR p.brand_id=?) ORDER BY t.name`,chosen,scope.user.brand_id,scope.user.brand_id)
+        :db.all('SELECT id,name,revoked FROM tvs WHERE venue_id=? ORDER BY name',chosen);
+    }
     const location=scope.venueId?db.get('SELECT address,city,region,postal_code AS postalCode,country,updated_at AS updatedAt FROM venue_locations WHERE venue_id=?',scope.venueId)||null:null;
     return json(res,200,{scope:scope.scope,venues,tvs,worlds:WORLDS,location,canEditLocation:scope.scope==='venue'&&scope.role!=='viewer'});
   }
