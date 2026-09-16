@@ -8,6 +8,27 @@ export async function adminRoutes(context){
         const user=admin(req),page=integer(b.page??1,'Page',1,10000),response=await bunnyList(config,page);let added=0;
         transaction(()=>{for(const video of response.items||[]){if(db.get('SELECT id FROM content WHERE provider=\'bunny\' AND asset_id=?',video.guid))continue;db.run('INSERT INTO content(id,title,worlds,duration,provider,asset_id,ready,created_at) VALUES(?,?,?,?,?,?,?,?)',id(),String(video.title).slice(0,160),'[]',Math.max(1,Math.min(14400,Math.floor(video.length||1))),'bunny',video.guid,video.status===4?1:0,now());added++;}});audit(user.id,null,'media.import',{added});return json(res,200,{added,totalItems:response.totalItems,page});
       }
+      if(method==='POST'&&path==='/api/admin/media/bulk'){
+        const user=admin(req);if(!Array.isArray(b.ids)||!b.ids.length||b.ids.length>100)fail(400,'Select between 1 and 100 videos.');
+        const ids=[...new Set(b.ids.map(v=>text(v,'Content ID',80)))],world=choice(b.world,WORLDS.map(w=>w.id),'content world'),resolution=choice(b.resolution??720,[360,480,720,1080],'MP4 resolution');
+        if(b.rightsConfirmed!==true)fail(400,'Confirm that you own or control public-venue exhibition and local-cache rights for every selected video.');
+        const results=[];
+        for(const contentId of ids){
+          const c=db.get('SELECT * FROM content WHERE id=?',contentId);if(!c){results.push({id:contentId,ok:false,error:'Content not found.'});continue;}
+          try{
+            let duration=c.duration,ready=c.ready;
+            if(c.provider==='bunny'){
+              const remote=await bunnyVideo(config,c.asset_id);if(remote.status!==4)throw Error('Encoding is not finished.');duration=Math.floor(remote.length||0);if(duration<1)throw Error('Video duration is unavailable.');
+              const mediaUrl=bunnyUrl(c.asset_id,resolution,config,Math.floor(now()/1000)+600);let check;
+              try{check=await fetch(mediaUrl,{method:'HEAD',signal:AbortSignal.timeout(15000)});}catch{throw Error('Could not verify the Bunny MP4.');}
+              if(!check.ok)throw Error(`MP4 verification returned ${check.status}.`);ready=1;
+            }else if(!config.DEMO_MODE)throw Error('Demo content is disabled.');
+            db.run("UPDATE content SET worlds=?,status='published',resolution=?,clean=?,rights_confirmed=1,rights_until=NULL,duration=?,ready=? WHERE id=?",JSON.stringify([world]),resolution,b.clean===true?1:0,duration,ready,c.id);
+            results.push({id:c.id,ok:true,title:c.title});
+          }catch(error){results.push({id:c.id,ok:false,title:c.title,error:String(error.message||error).slice(0,160)});}
+        }
+        const published=results.filter(r=>r.ok).length,failed=results.length-published;audit(user.id,null,'media.bulk-published',{selected:results.length,published,failed,world,resolution});return json(res,200,{selected:results.length,published,failed,results});
+      }
       if(method==='PATCH'&&/^\/api\/admin\/media\/[^/]+$/.test(path)){
         const user=admin(req),contentId=path.split('/').at(-1),c=db.get('SELECT * FROM content WHERE id=?',contentId);if(!c)fail(404,'Content not found.');
         if(!Array.isArray(b.worlds)||!b.worlds.length||b.worlds.some(w=>!WORLDS.some(x=>x.id===w)))fail(400,'Choose at least one content world.');
