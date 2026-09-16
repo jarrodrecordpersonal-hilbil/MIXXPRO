@@ -1,6 +1,11 @@
+import {readFileSync} from 'node:fs';
+const MIXXWAVE_LOGO=readFileSync(new URL('../../web/public/mixxwave-logo.svg',import.meta.url),'utf8');
 /** Public API routes. Authorization remains inside every scoped operation. */
 export async function publicRoutes(context){
   const {req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg}=context;
+      if(method==='GET'&&path==='/mixxwave-logo.svg'){
+        res.writeHead(200,{'Content-Type':'image/svg+xml; charset=utf-8','Cache-Control':'public, max-age=86400'});return res.end(MIXXWAVE_LOGO);
+      }
       if(method==='GET'&&path.startsWith('/api/public/link/')){
         const code=path.split('/').at(-1),link=db.get('SELECT * FROM qr_links WHERE code=? AND expires_at>?',code,now()),v=link?getVenue(link.venue_id):db.get('SELECT * FROM venues WHERE qr_code=?',code);
         if(!v)fail(404,'This QR link has expired or does not exist.');
