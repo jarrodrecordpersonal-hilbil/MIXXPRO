@@ -17,7 +17,8 @@ test('polish keeps MIXDATA separate and exposes four simple setup actions',()=>{
   assert.match(script,/page==='mixdata'/);
   assert.match(script,/location\.href='\/screens'/);
   assert.match(script,/MIXXTANK for venues','MIXXWAVE for venues'/);
-  assert.doesNotMatch(script,/fetch\(|\/api\//);
+  assert.match(script,/fetch\('\/api\/config'/);
+  assert.doesNotMatch(script,/fetch\([^)]*\/api\/(?!config)/);
 });
 
 test('runtime, generated administrator and docs use MIXXWAVE venue-facing terminology',()=>{
