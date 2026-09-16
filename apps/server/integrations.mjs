@@ -4,12 +4,16 @@ const sha=s=>createHash('sha256').update(s).digest('hex');
 const hmac=(key,s,encoding)=>createHmac('sha256',key).update(s).digest(encoding);
 const enc=s=>encodeURIComponent(s).replace(/[!'()*]/g,c=>`%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 /** Bunny advanced (HS256) exact-file CDN token, not an iframe/embed token. */
-export function bunnyUrl(assetId,resolution,config,expires){
+export function bunnyFileUrl(assetId,filename,config,expires){
   if(!config.BUNNY_CDN_HOST||!config.BUNNY_TOKEN_KEY)fail(503,'Bunny CDN credentials are not configured.');
-  if(!/^[a-zA-Z0-9-]+$/.test(assetId)||![360,480,720,1080].includes(resolution))fail(400,'Invalid media asset.');
-  const path=`/${assetId}/play_${resolution}p.mp4`;
+  if(!/^[a-zA-Z0-9-]+$/.test(assetId)||!/^[-a-zA-Z0-9_.]+$/.test(filename))fail(400,'Invalid media asset.');
+  const path=`/${assetId}/${filename}`;
   const signature=hmac(config.BUNNY_TOKEN_KEY,path+expires,'base64url');
   return `https://${config.BUNNY_CDN_HOST}${path}?token=HS256-${signature}&expires=${expires}`;
+}
+export function bunnyUrl(assetId,resolution,config,expires){
+  if(![360,480,720,1080].includes(resolution))fail(400,'Invalid media asset.');
+  return bunnyFileUrl(assetId,`play_${resolution}p.mp4`,config,expires);
 }
 /** S3 Signature V4 presigned PUT. Restrict CORS on the private R2 bucket. */
 export function r2UploadUrl(key,contentType,config,now=new Date()){

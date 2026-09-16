@@ -1,6 +1,12 @@
 /** Venue API routes. Authorization remains inside every scoped operation. */
 export async function venueRoutes(context){
   const {req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg}=context;
+      if(method==='GET'&&path==='/api/catalog'){
+        const {venue}=access(req);
+        const rows=db.all("SELECT id,title,worlds,tags,duration,provider,asset_id,resolution,clean,premium_only,sponsor FROM content WHERE status='published' AND ready=1 AND rights_confirmed=1 AND (rights_until IS NULL OR rights_until>?) ORDER BY created_at DESC",now());
+        const content=rows.filter(c=>!(venue.plan!=='premium'&&c.premium_only)).map(c=>({id:c.id,title:c.title,worlds:parse(c.worlds,[]),tags:parse(c.tags,[]),duration:c.duration,provider:c.provider,resolution:c.resolution,clean:!!c.clean,premiumOnly:!!c.premium_only,sponsor:!!c.sponsor}));
+        return json(res,200,{content,worlds:WORLDS.map(w=>({id:w.id,name:w.name,description:w.description})),measurement:'Catalog availability only. Playback is controlled through the venue MIXX and TV remote.'});
+      }
       if(method==='POST'&&path==='/api/schedules'){
         const {venue,user}=access(req,true);const mix=mixDefinition(b.mix),theme=choice(b.theme,THEMES.map(t=>t.id),'theme');
         const name=text(b.name,'Schedule name',80);const time=v=>typeof v==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(v);
