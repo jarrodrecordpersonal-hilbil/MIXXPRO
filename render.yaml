@@ -1,0 +1,38 @@
+{
+  "previews": { "generation": "off" },
+  "services": [
+    {
+      "type": "web",
+      "name": "mixxwave-pilot",
+      "runtime": "docker",
+      "repo": "https://github.com/jarrodrecordpersonal-hilbil/MIXXPRO",
+      "branch": "main",
+      "region": "ohio",
+      "plan": "0.5c-512mb",
+      "numInstances": 1,
+      "autoDeployTrigger": "off",
+      "dockerfilePath": "./Dockerfile",
+      "dockerContext": ".",
+      "healthCheckPath": "/api/health",
+      "domains": ["mixxwave.com"],
+      "disk": { "name": "mixxwave-data", "mountPath": "/app/data", "sizeGB": 5 },
+      "envVars": [
+        { "key": "NODE_ENV", "value": "production" },
+        { "key": "HOST", "value": "0.0.0.0" },
+        { "key": "PORT", "value": "3000" },
+        { "key": "APP_ORIGIN", "value": "https://mixxwave.com" },
+        { "key": "DB_PATH", "value": "/app/data/mixxpro.sqlite" },
+        { "key": "APP_SECRET", "generateValue": true },
+        { "key": "DEMO_MODE", "value": "false" },
+        { "key": "SIGNUPS_ENABLED", "value": "false" },
+        { "key": "TRUST_PROXY", "value": "false" },
+        { "key": "FREE_TV_LIMIT", "value": "5" },
+        { "key": "COMMISSION_BPS", "value": "0" },
+        { "key": "BUNNY_LIBRARY_ID", "sync": false },
+        { "key": "BUNNY_API_KEY", "sync": false },
+        { "key": "BUNNY_CDN_HOST", "sync": false },
+        { "key": "BUNNY_TOKEN_KEY", "sync": false }
+      ]
+    }
+  ]
+}
