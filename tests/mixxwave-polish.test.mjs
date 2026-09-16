@@ -20,9 +20,11 @@ test('polish keeps MIXDATA separate and exposes four simple setup actions',()=>{
   assert.doesNotMatch(script,/fetch\(|\/api\//);
 });
 
-test('runtime and generated administrator defaults use MIXXWAVE',()=>{
-  const main=read('apps/server/main.mjs'),admin=read('scripts/admin.mjs');
+test('runtime, generated administrator and docs use MIXXWAVE venue-facing terminology',()=>{
+  const main=read('apps/server/main.mjs'),admin=read('scripts/admin.mjs'),readme=read('README.md');
   assert.match(main,/MIXXWAVE \$\{app\.config\.DEMO_MODE/);
   assert.doesNotMatch(main,/MIXXPRO/);
   assert.match(admin,/MIXXWAVE Administrator/);
+  assert.match(readme,/^# MIXXWAVE · MIXXTANK for venues/m);
+  assert.match(readme,/\*\*MIXDATA\*\* is its screen-analytics surface/);
 });
