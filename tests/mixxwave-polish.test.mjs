@@ -20,8 +20,9 @@ test('polish keeps MIXDATA separate and exposes four simple setup actions',()=>{
   assert.doesNotMatch(script,/fetch\(|\/api\//);
 });
 
-test('runtime log uses MIXXWAVE without changing app internals',()=>{
-  const main=read('apps/server/main.mjs');
+test('runtime and generated administrator defaults use MIXXWAVE',()=>{
+  const main=read('apps/server/main.mjs'),admin=read('scripts/admin.mjs');
   assert.match(main,/MIXXWAVE \$\{app\.config\.DEMO_MODE/);
   assert.doesNotMatch(main,/MIXXPRO/);
+  assert.match(admin,/MIXXWAVE Administrator/);
 });
