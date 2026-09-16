@@ -1,11 +1,48 @@
 /** Venue API routes. Authorization remains inside every scoped operation. */
 export async function venueRoutes(context){
   const {req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg}=context;
+      const validateBlock=definition=>{
+        if(!definition||typeof definition!=='object'||Array.isArray(definition))fail(400,'Workshop block definition is required.');
+        if(!Array.isArray(definition.segments)||!definition.segments.length||definition.segments.length>24)fail(400,'Use between 1 and 24 Workshop segments.');
+        const segments=definition.segments.map((s,index)=>{
+          if(!s||typeof s!=='object'||Array.isArray(s))fail(400,`Segment ${index+1} is invalid.`);
+          const world=choice(s.world,WORLDS.map(w=>w.id),`segment ${index+1} world`),minutes=integer(s.minutes,`segment ${index+1} minutes`,5,180);
+          return {world,minutes};
+        });
+        return {segments};
+      };
+      const blockOut=row=>({...row,definition:parse(row.definition,{segments:[]})});
       if(method==='GET'&&path==='/api/catalog'){
         const {venue}=access(req);
         const rows=db.all("SELECT id,title,worlds,tags,duration,provider,asset_id,resolution,clean,premium_only,sponsor FROM content WHERE status='published' AND ready=1 AND rights_confirmed=1 AND (rights_until IS NULL OR rights_until>?) ORDER BY created_at DESC",now());
         const content=rows.filter(c=>!(venue.plan!=='premium'&&c.premium_only)).map(c=>({id:c.id,title:c.title,worlds:parse(c.worlds,[]),tags:parse(c.tags,[]),duration:c.duration,provider:c.provider,resolution:c.resolution,clean:!!c.clean,premiumOnly:!!c.premium_only,sponsor:!!c.sponsor}));
         return json(res,200,{content,worlds:WORLDS.map(w=>({id:w.id,name:w.name,description:w.description})),measurement:'Catalog availability only. Playback is controlled through the venue MIXX and TV remote.'});
+      }
+      if(method==='GET'&&path==='/api/workshop/blocks'){
+        const {venue}=access(req);
+        const blocks=db.all('SELECT * FROM workshop_blocks WHERE venue_id=? ORDER BY updated_at DESC,name',venue.id).map(blockOut);
+        const templates=[
+          {id:'template-bourbon-hour',name:'Bourbon Hour',description:'A focused 30-minute bourbon block.',definition:{segments:[{world:'bourbon',minutes:30}]}},
+          {id:'template-cocktail-break',name:'Cocktail Break',description:'A short cocktail reset between longer programming.',definition:{segments:[{world:'cocktails',minutes:10}]}},
+          {id:'template-night-out',name:'Night Out',description:'Food, cocktails and bourbon for an evening room.',definition:{segments:[{world:'food',minutes:20},{world:'cocktails',minutes:15},{world:'bourbon',minutes:25}]}},
+          {id:'template-weekend',name:'Weekend Mix',description:'Golf, outdoors and bourbon in one easy block.',definition:{segments:[{world:'golf',minutes:25},{world:'outdoors',minutes:20},{world:'bourbon',minutes:25}]}}
+        ];
+        return json(res,200,{blocks,templates,worlds:WORLDS.map(w=>({id:w.id,name:w.name}))});
+      }
+      if(method==='POST'&&path==='/api/workshop/blocks'){
+        const {venue,user}=access(req,true),definition=validateBlock(b.definition),blockId=id(),created=now();
+        const name=text(b.name,'Block name',80),description=b.description?text(b.description,'Block description',240):'';
+        db.run('INSERT INTO workshop_blocks(id,venue_id,name,description,definition,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',blockId,venue.id,name,description,JSON.stringify(definition),created,created);
+        audit(user.id,venue.id,'workshop.block.created',{blockId});return json(res,201,{block:blockOut(db.get('SELECT * FROM workshop_blocks WHERE id=?',blockId))});
+      }
+      if(method==='PATCH'&&/^\/api\/workshop\/blocks\/[^/]+$/.test(path)){
+        const {venue,user}=access(req,true),blockId=path.split('/').at(-1),existing=db.get('SELECT * FROM workshop_blocks WHERE id=? AND venue_id=?',blockId,venue.id);if(!existing)fail(404,'Workshop block not found.');
+        const definition=b.definition===undefined?parse(existing.definition):validateBlock(b.definition),name=b.name===undefined?existing.name:text(b.name,'Block name',80),description=b.description===undefined?existing.description:(b.description?text(b.description,'Block description',240):'');
+        db.run('UPDATE workshop_blocks SET name=?,description=?,definition=?,updated_at=? WHERE id=? AND venue_id=?',name,description,JSON.stringify(definition),now(),blockId,venue.id);audit(user.id,venue.id,'workshop.block.updated',{blockId});return json(res,200,{block:blockOut(db.get('SELECT * FROM workshop_blocks WHERE id=?',blockId))});
+      }
+      if(method==='DELETE'&&/^\/api\/workshop\/blocks\/[^/]+$/.test(path)){
+        const {venue,user}=access(req,true),blockId=path.split('/').at(-1),existing=db.get('SELECT id FROM workshop_blocks WHERE id=? AND venue_id=?',blockId,venue.id);if(!existing)fail(404,'Workshop block not found.');
+        db.run('DELETE FROM workshop_blocks WHERE id=? AND venue_id=?',blockId,venue.id);audit(user.id,venue.id,'workshop.block.deleted',{blockId});return json(res,200,{ok:true});
       }
       if(method==='POST'&&path==='/api/schedules'){
         const {venue,user}=access(req,true);const mix=mixDefinition(b.mix),theme=choice(b.theme,THEMES.map(t=>t.id),'theme');
