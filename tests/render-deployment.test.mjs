@@ -5,7 +5,6 @@ import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createApplication,configuration} from '../apps/server/app.mjs';
-// JSON is valid YAML. This keeps deployment contract tests dependency-free.
 const blueprint=JSON.parse(readFileSync(new URL('../render.yaml',import.meta.url),'utf8'));
 const service=blueprint.services[0];
 const env=Object.fromEntries(service.envVars.map(e=>[e.key,e]));
@@ -23,17 +22,17 @@ test('GoDaddy domain target and application origin agree, without rebranding MIX
   assert.equal(env.APP_ORIGIN.value,'https://mixxwave.com');
   assert.match(readFileSync(new URL('../apps/web/screens/index.html',import.meta.url),'utf8'),/MIXDATA/);
 });
-test('Bunny configuration is requested privately and application secret is host-generated',()=>{
-  for(const key of ['BUNNY_LIBRARY_ID','BUNNY_API_KEY','BUNNY_CDN_HOST','BUNNY_TOKEN_KEY']){
+test('Bunny and Google credentials are requested privately and application secret is host-generated',()=>{
+  for(const key of ['BUNNY_LIBRARY_ID','BUNNY_API_KEY','BUNNY_CDN_HOST','BUNNY_TOKEN_KEY','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET']){
     assert.equal(env[key].sync,false);assert.equal(env[key].value,undefined);
   }
   assert.equal(env.APP_SECRET.generateValue,true);assert.equal(env.APP_SECRET.value,undefined);
   assert.equal(env.MIXX_ADMIN_PASSWORD,undefined);
   assert.equal(new Set(service.envVars.map(e=>e.key)).size,service.envVars.length);
 });
-test('First deployment cannot silently enable demo media, public signups, commission or paid integrations',()=>{
+test('Public venue signup is deliberate while demo media, commission and paid integrations remain off',()=>{
   assert.equal(env.NODE_ENV.value,'production');assert.equal(env.DEMO_MODE.value,'false');
-  assert.equal(env.SIGNUPS_ENABLED.value,'false');assert.equal(env.TRUST_PROXY.value,'false');
+  assert.equal(env.SIGNUPS_ENABLED.value,'true');assert.equal(env.TRUST_PROXY.value,'false');
   assert.equal(env.COMMISSION_BPS.value,'0');
   assert.equal(service.envVars.some(e=>/^STRIPE_|^COMMERCE_|^R2_/.test(e.key)),false);
 });
@@ -60,12 +59,12 @@ test('Production configuration starts locally, keeps private configuration priva
     const health=await fetch(base+service.healthCheckPath);assert.equal(health.status,200);
     assert.equal((await health.json()).ok,true);
     const publicConfig=await (await fetch(base+'/api/config')).json();
-    assert.equal(publicConfig.demo,false);assert.equal(publicConfig.signups,false);assert.equal(publicConfig.mediaReady,false);
+    assert.equal(publicConfig.demo,false);assert.equal(publicConfig.signups,true);assert.equal(publicConfig.googleReady,false);assert.equal(publicConfig.mediaReady,false);
     assert.equal(JSON.stringify(publicConfig).includes(config.APP_SECRET),false);
     assert.equal((await fetch(base+'/api/session')).status,401);
     assert.equal((await fetch(base+'/api/screen-activity?scope=network')).status,401);
     const signup=await fetch(base+'/api/auth/signup',{method:'POST',headers:{'Content-Type':'application/json',Origin:config.APP_ORIGIN},body:'{}'});
-    assert.equal(signup.status,403);
+    assert.equal(signup.status,400);
     assert.deepEqual(app.db.all('SELECT version FROM migrations ORDER BY version').map(r=>r.version),[1,2,3]);
     assert.match((await fetch(base)).headers.get('strict-transport-security'),/max-age=/);
   }finally{await app.close();rmSync(dir,{recursive:true,force:true});}
