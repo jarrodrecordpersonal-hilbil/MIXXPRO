@@ -11,14 +11,14 @@ test('main page presents MIXXWAVE immediately and loads presentation polish',()=
   assert.match(html,/src="\/polish\.mjs"/);
 });
 
-test('polish keeps MIXDATA separate and exposes four simple setup actions',()=>{
+test('polish keeps MIXDATA separate, exposes setup actions and a catalog browser',()=>{
   const script=read('apps/web/public/polish.mjs');
-  for(const copy of ['Choose the MIXX','Pick the look','Connect the TV','Open MIXDATA'])assert.match(script,new RegExp(copy));
+  for(const copy of ['Choose the MIXX','Pick the look','Connect the TV','Open MIXDATA','Browse videos','Browse available videos'])assert.match(script,new RegExp(copy));
   assert.match(script,/page==='mixdata'/);
   assert.match(script,/location\.href='\/screens'/);
   assert.match(script,/MIXXTANK for venues','MIXXWAVE for venues'/);
   assert.match(script,/fetch\('\/api\/config'/);
-  assert.doesNotMatch(script,/fetch\([^)]*\/api\/(?!config)/);
+  assert.match(script,/fetch\('\/api\/catalog'/);
 });
 
 test('runtime, generated administrator and docs use MIXXWAVE venue-facing terminology',()=>{
