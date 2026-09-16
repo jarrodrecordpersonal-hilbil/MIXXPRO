@@ -1,8 +1,44 @@
 /** Auth API routes. Authorization remains inside every scoped operation. */
 export async function authRoutes(context){
   const {req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg}=context;
+      const googleReady=!!(process.env.GOOGLE_CLIENT_ID&&process.env.GOOGLE_CLIENT_SECRET);
       if(method==='GET'&&path==='/api/health')return json(res,200,{ok:true,version:'0.2.0'});
-      if(method==='GET'&&path==='/api/config')return json(res,200,{worlds:WORLDS,themes:THEMES,demo:config.DEMO_MODE,signups:config.SIGNUPS_ENABLED,mediaReady:!!(config.BUNNY_CDN_HOST&&config.BUNNY_TOKEN_KEY),commerceReady:!!config.COMMERCE_URL,commissionConfigured:config.COMMISSION_BPS>0});
+      if(method==='GET'&&path==='/api/config')return json(res,200,{worlds:WORLDS,themes:THEMES,demo:config.DEMO_MODE,signups:config.SIGNUPS_ENABLED,googleReady,mediaReady:!!(config.BUNNY_CDN_HOST&&config.BUNNY_TOKEN_KEY),commerceReady:!!config.COMMERCE_URL,commissionConfigured:config.COMMISSION_BPS>0});
+      if(method==='GET'&&path==='/api/auth/google'){
+        if(!googleReady)fail(503,'Google sign-in is not configured yet.');
+        rateLimit(db,`google-start:${ip}`,30,900000);
+        const state=token(24),signature=mac(config.APP_SECRET,state),redirectUri=`${config.APP_ORIGIN}/api/auth/google/callback`;
+        res.setHeader('Set-Cookie',`mixx_google_state=${state}.${signature}; Path=/api/auth/google/callback; HttpOnly; SameSite=Lax; Max-Age=600${config.PRODUCTION?'; Secure':''}`);
+        const params=new URLSearchParams({client_id:process.env.GOOGLE_CLIENT_ID,redirect_uri:redirectUri,response_type:'code',scope:'openid email profile',state,prompt:'select_account'});
+        res.writeHead(302,{Location:`https://accounts.google.com/o/oauth2/v2/auth?${params}`,'Cache-Control':'no-store'});return res.end();
+      }
+      if(method==='GET'&&path==='/api/auth/google/callback'){
+        if(!googleReady)fail(503,'Google sign-in is not configured yet.');
+        rateLimit(db,`google-callback:${ip}`,30,900000);
+        if(url.searchParams.get('error')){res.writeHead(302,{Location:'/?google=cancelled','Cache-Control':'no-store'});return res.end();}
+        const code=url.searchParams.get('code')||'',state=url.searchParams.get('state')||'';
+        const saved=(req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('mixx_google_state='))?.slice(18)?.split('.')||[];
+        const validState=saved.length===2&&equal(saved[0],state)&&equal(saved[1],mac(config.APP_SECRET,state));
+        res.setHeader('Set-Cookie',`mixx_google_state=; Path=/api/auth/google/callback; HttpOnly; SameSite=Lax; Max-Age=0${config.PRODUCTION?'; Secure':''}`);
+        if(!code||!validState)fail(403,'Google sign-in session expired. Please try again.');
+        const redirectUri=`${config.APP_ORIGIN}/api/auth/google/callback`;
+        const tokenResponse=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({code,client_id:process.env.GOOGLE_CLIENT_ID,client_secret:process.env.GOOGLE_CLIENT_SECRET,redirect_uri:redirectUri,grant_type:'authorization_code'})});
+        if(!tokenResponse.ok)fail(401,'Google could not complete sign-in. Please try again.');
+        const tokens=await tokenResponse.json();if(!tokens.id_token)fail(401,'Google did not return a valid identity.');
+        const infoResponse=await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(tokens.id_token)}`);
+        if(!infoResponse.ok)fail(401,'Google identity verification failed.');
+        const profile=await infoResponse.json();
+        if(profile.aud!==process.env.GOOGLE_CLIENT_ID||profile.email_verified!=='true'||!profile.email)fail(401,'A verified Google email is required.');
+        const email=String(profile.email).trim().toLowerCase(),name=String(profile.name||profile.given_name||email.split('@')[0]).slice(0,80);
+        let user=db.get('SELECT * FROM users WHERE email=?',email),venue=null;
+        if(!user){
+          if(!config.SIGNUPS_ENABLED)fail(403,'New account creation is temporarily unavailable.');
+          const userId=id(),pw=await passwordHash(token(32));
+          transaction(()=>{db.run('INSERT INTO users(id,email,password_hash,name,created_at) VALUES(?,?,?,?,?)',userId,email,pw,name,now());venue=createVenue(userId,{name:`${String(profile.given_name||name).slice(0,50)}'s Venue`,type:'other',timezone:'America/Chicago'});});
+          user=db.get('SELECT * FROM users WHERE id=?',userId);audit(userId,venue.id,'signup.google');
+        }
+        issueSession(res,user.id);audit(user.id,venue?.id||null,'login.google');res.writeHead(302,{Location:'/?google=ok','Cache-Control':'no-store'});return res.end();
+      }
       if(method==='POST'&&path==='/api/auth/signup'){
         if(!config.SIGNUPS_ENABLED)fail(403,'Signups are currently invitation-only.');rateLimit(db,`signup:${ip}`,10,3600000);
         const email=text(b.email,'Email',254).toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))fail(400,'Enter a valid email.');
