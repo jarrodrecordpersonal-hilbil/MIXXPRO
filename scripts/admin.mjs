@@ -2,7 +2,7 @@ import {openDatabase} from '../apps/server/db.mjs';
 import {configuration} from '../apps/server/app.mjs';
 import {passwordHash,token} from '../apps/server/security.mjs';
 const args=process.argv.slice(2);const value=(name,fallback='')=>args.includes(name)?args[args.indexOf(name)+1]:fallback;
-const email=value('--email').trim().toLowerCase(),role=value('--role','admin'),name=value('--name','MIXXPRO Administrator'),brand=value('--brand');
+const email=value('--email').trim().toLowerCase(),role=value('--role','admin'),name=value('--name','MIXXWAVE Administrator'),brand=value('--brand');
 if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!['admin','brand','venue'].includes(role)||(role==='brand'&&!brand)){
  console.error('Usage: npm run admin -- --email owner@example.com [--name Name] [--role admin|brand|venue] [--brand ID]');process.exit(1);
 }
