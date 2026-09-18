@@ -27,7 +27,14 @@ def passed(label):
 def nav(page, name):
     target = page.locator(f'[data-page="{name}"]').first
     if not target.is_visible():
-        page.locator('[data-action="menu"]').click()
+        menu = page.locator('[data-action="menu"]')
+        if menu.is_visible():
+            menu.click()
+    if not target.is_visible():
+        settings = target.locator('xpath=ancestor::details[@data-stream-settings]')
+        if settings.count() and not settings.evaluate('(el)=>el.open'):
+            settings.locator('summary').click()
+    expect(target).to_be_visible()
     target.click()
     expect(target).to_have_attribute('aria-current', 'page')
 
@@ -182,10 +189,6 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     page.screenshot(path=str(OUT / 'native-home-desktop.png'), full_page=True)
                     page.set_viewport_size({'width': 390, 'height': 844})
                     for view in ['home', 'mixx', 'themes', 'tvs', 'schedule', 'commerce', 'revenue', 'billing']:
-                        if view not in ['home','mixx','tvs','revenue']:
-                            settings=page.locator('[data-stream-settings]')
-                            if not settings.get_attribute('open'):
-                                settings.locator('summary').click()
                         nav(page, view)
                         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), view + ' overflows'
                         if view == 'mixx':
