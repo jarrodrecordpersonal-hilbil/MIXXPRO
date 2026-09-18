@@ -19,10 +19,10 @@ export async function venueRoutes(context){
         const blocked=Array.isArray(b.blockedBrands)?[...new Set(b.blockedBrands.map(x=>text(x,'Brand',80)))]:[];
         const savedId=id(),created=now();db.run('INSERT INTO saved_mixxes(id,venue_id,name,mix,theme,accent,playback_mode,show_qr,show_venue_promotions,blocked_brands,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',savedId,venue.id,text(b.name,'MIXX name',80),JSON.stringify(mix),choice(b.theme||venue.theme,THEMES.map(t=>t.id),'theme'),text(b.accent||venue.accent,'Accent',20),playbackMode,clean?0:(b.showQr===false?0:1),clean?0:(b.showVenuePromotions===false?0:1),JSON.stringify(blocked),created,created);audit(user.id,venue.id,'saved_mixx.created',{savedId,playbackMode});return json(res,201,{ok:true,id:savedId});
       }
-      if(method==='DELETE'&&/^\\/api\\/saved-mixxes\\/[^/]+$/.test(path)){
+      if(method==='DELETE'&&/^\/api\/saved-mixxes\/[^/]+$/.test(path)){
         const {venue}=access(req,true),savedId=path.split('/').at(-1);db.run('DELETE FROM saved_mixxes WHERE id=? AND venue_id=?',savedId,venue.id);return json(res,200,{ok:true});
       }
-      if(method==='POST'&&/^\\/api\\/tvs\\/[^/]+\\/profile$/.test(path)){
+      if(method==='POST'&&/^\/api\/tvs\/[^/]+\/profile$/.test(path)){
         const {venue,user}=access(req,true),tvId=path.split('/')[3],tv=tvRows(venue.id).find(t=>t.id===tvId);if(!tv)fail(404,'TV not found.');
         const saved=db.get('SELECT id FROM saved_mixxes WHERE id=? AND venue_id=?',text(b.savedMixxId,'Saved MIXX',80),venue.id);if(!saved)fail(404,'Saved MIXX not found.');
         db.run('INSERT INTO tv_profiles(tv_id,saved_mixx_id,updated_at) VALUES(?,?,?) ON CONFLICT(tv_id) DO UPDATE SET saved_mixx_id=excluded.saved_mixx_id,updated_at=excluded.updated_at',tvId,saved.id,now());audit(user.id,venue.id,'tv.profile.changed',{tvId,savedMixxId:saved.id});return json(res,200,{ok:true});
@@ -36,7 +36,7 @@ export async function venueRoutes(context){
         db.run('INSERT INTO venue_creatives(id,venue_id,title,kind,status,asset_url,starts_at,ends_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',creativeId,venue.id,text(b.title||filename,'Title',80),'video','processing',key,b.startsAt||null,b.endsAt||null,created,created);audit(user.id,venue.id,'creative.upload.started',{creativeId});
         return json(res,201,{ok:true,id:creativeId,upload});
       }
-      if(method==='POST'&&/^\\/api\\/venue-creatives\\/[^/]+\\/ready$/.test(path)){
+      if(method==='POST'&&/^\/api\/venue-creatives\/[^/]+\/ready$/.test(path)){
         const {venue,user}=access(req,true),creativeId=path.split('/')[3],creative=db.get('SELECT * FROM venue_creatives WHERE id=? AND venue_id=?',creativeId,venue.id);if(!creative)fail(404,'Creative not found.');
         const playbackUrl=text(b.playbackUrl,'Playback URL',2000);let parsedUrl;try{parsedUrl=new URL(playbackUrl);}catch{fail(400,'Provide a valid processed playback URL.');}if(parsedUrl.protocol!=='https:')fail(400,'Playback URL must use HTTPS.');
         db.run("UPDATE venue_creatives SET status='ready',asset_url=?,updated_at=? WHERE id=? AND venue_id=?",playbackUrl,now(),creativeId,venue.id);audit(user.id,venue.id,'creative.ready',{creativeId});return json(res,200,{ok:true});
