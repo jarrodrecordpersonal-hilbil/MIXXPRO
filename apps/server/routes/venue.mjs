@@ -35,7 +35,8 @@ export async function venueRoutes(context){
       }
       if(method==='POST'&&/^\\/api\\/venue-creatives\\/[^/]+\\/ready$/.test(path)){
         const {venue,user}=access(req,true),creativeId=path.split('/')[3],creative=db.get('SELECT * FROM venue_creatives WHERE id=? AND venue_id=?',creativeId,venue.id);if(!creative)fail(404,'Creative not found.');
-        db.run("UPDATE venue_creatives SET status='ready',updated_at=? WHERE id=? AND venue_id=?",now(),creativeId,venue.id);audit(user.id,venue.id,'creative.ready',{creativeId});return json(res,200,{ok:true});
+        const playbackUrl=text(b.playbackUrl,'Playback URL',2000);let parsedUrl;try{parsedUrl=new URL(playbackUrl);}catch{fail(400,'Provide a valid processed playback URL.');}if(parsedUrl.protocol!=='https:')fail(400,'Playback URL must use HTTPS.');
+        db.run("UPDATE venue_creatives SET status='ready',asset_url=?,updated_at=? WHERE id=? AND venue_id=?",playbackUrl,now(),creativeId,venue.id);audit(user.id,venue.id,'creative.ready',{creativeId});return json(res,200,{ok:true});
       }
       if(method==='POST'&&path==='/api/venue-creatives/request'){
         const {venue,user}=access(req,true),created=now(),creativeId=id();db.run('INSERT INTO venue_creatives(id,venue_id,title,kind,status,starts_at,ends_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',creativeId,venue.id,text(b.title||'Venue promotion','Title',80),'template-request','draft',b.startsAt||null,b.endsAt||null,created,created);audit(user.id,venue.id,'creative.requested',{creativeId});return json(res,201,{ok:true,id:creativeId});
