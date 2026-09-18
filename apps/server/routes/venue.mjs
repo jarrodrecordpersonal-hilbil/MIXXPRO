@@ -7,6 +7,9 @@ export async function venueRoutes(context){
         const content=rows.filter(c=>!(venue.plan!=='premium'&&c.premium_only)).map(c=>({id:c.id,title:c.title,worlds:parse(c.worlds,[]),tags:parse(c.tags,[]),duration:c.duration,provider:c.provider,resolution:c.resolution,clean:!!c.clean,premiumOnly:!!c.premium_only,sponsor:!!c.sponsor}));
         return json(res,200,{content,worlds:WORLDS.map(w=>({id:w.id,name:w.name,description:w.description})),measurement:'Catalog availability only. Playback is controlled through the venue MIXX and TV remote.'});
       }
+      if(method==='GET'&&path==='/api/current-mix'){
+        const {venue}=access(req);return json(res,200,{mix:venue.mix,theme:venue.theme,accent:venue.accent});
+      }
       if(method==='GET'&&path==='/api/saved-mixxes'){
         const {venue}=access(req);const rows=db.all('SELECT * FROM saved_mixxes WHERE venue_id=? ORDER BY updated_at DESC',venue.id).map(x=>({...x,mix:parse(x.mix,DEFAULT_MIX),blockedBrands:parse(x.blocked_brands,[]),showQr:!!x.show_qr,showVenuePromotions:!!x.show_venue_promotions}));
         return json(res,200,{mixxes:rows});
