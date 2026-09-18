@@ -1,11 +1,12 @@
 // MIXXWAVE streamlined venue shell. Presentation-only: keeps existing routes/actions and backend behavior intact.
 const VENUE_PAGES=new Set(['home','mixx','tvs','revenue']);
 const LABELS={home:'Home',mixx:'MIXX',tvs:'TV',revenue:'Results'};
-function venueMode(){const nav=document.querySelector('.navigation');if(!nav)return false;return !nav.querySelector('[data-page="admin"],[data-page="brands"]');}
+function venueMode(){const nav=document.querySelector('.navigation');if(!nav)return false;return !!nav.querySelector('[data-page="home"],[data-page="mixx"],[data-page="tvs"]');}
 function streamlineNav(){if(!venueMode())return;const nav=document.querySelector('.navigation');for(const b of [...nav.querySelectorAll('[data-page]')]){const p=b.dataset.page;if(!VENUE_PAGES.has(p)){b.hidden=true;continue;}const svg=b.querySelector('svg')?.outerHTML||'';b.innerHTML=svg+LABELS[p];}const crumb=document.querySelector('.breadcrumb');if(crumb){const p=document.querySelector('.navigation [aria-current="page"]')?.dataset.page;if(p&&LABELS[p])crumb.innerHTML=`MIXXWAVE <span>/</span> ${LABELS[p]}`;}const label=document.querySelector('.nav-label');if(label)label.textContent='YOUR MIXXWAVE';const tagline=document.querySelector('.tagline');if(tagline)tagline.textContent='Play more. Manage less.';}
 function streamlineHome(){if(!venueMode())return;const active=document.querySelector('.navigation [data-page="home"][aria-current="page"]');if(!active)return;const main=document.querySelector('.main');if(!main||main.dataset.streamlinedHome==='1')return;main.dataset.streamlinedHome='1';
   // Remove promotional/welcome material and oversized preview. Keep the live metrics and the working remote.
   const header=main.querySelector('.header');if(header)header.remove();
+  for(const el of [...main.querySelectorAll('*')]){if(/TV APPEARANCE PREVIEW|Your room\.\s*Your kind of stories\.|Preview, not live video|Stay in your world\.|What's the mood today\?/i.test(el.textContent||'')){const card=el.closest('.tv-preview,.preview-card,.hero,.section,.card');if(card&&card!==main&&!card.classList.contains('room-control'))card.remove();}}
   main.querySelector('.welcome-strip')?.remove();
   main.querySelector('.mixxwave-launchpad')?.remove();
   main.querySelector('.mixxwave-catalog-entry')?.remove();
