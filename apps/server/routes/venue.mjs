@@ -27,6 +27,16 @@ export async function venueRoutes(context){
       if(method==='GET'&&path==='/api/venue-creatives'){
         const {venue}=access(req);return json(res,200,{creatives:db.all('SELECT * FROM venue_creatives WHERE venue_id=? ORDER BY updated_at DESC',venue.id)});
       }
+      if(method==='POST'&&path==='/api/venue-creatives/upload'){
+        const {venue,user}=access(req,true),filename=text(b.filename,'File name',160),contentType=choice(b.contentType,['video/mp4','video/quicktime'],'video type'),created=now(),creativeId=id();
+        const safe=filename.replace(/[^a-zA-Z0-9._-]/g,'_'),key=`venue-creatives/${venue.id}/${creativeId}/${safe}`,upload=r2UploadUrl(key,contentType,config);
+        db.run('INSERT INTO venue_creatives(id,venue_id,title,kind,status,asset_url,starts_at,ends_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',creativeId,venue.id,text(b.title||filename,'Title',80),'video','processing',key,b.startsAt||null,b.endsAt||null,created,created);audit(user.id,venue.id,'creative.upload.started',{creativeId});
+        return json(res,201,{ok:true,id:creativeId,upload});
+      }
+      if(method==='POST'&&/^\\/api\\/venue-creatives\\/[^/]+\\/ready$/.test(path)){
+        const {venue,user}=access(req,true),creativeId=path.split('/')[3],creative=db.get('SELECT * FROM venue_creatives WHERE id=? AND venue_id=?',creativeId,venue.id);if(!creative)fail(404,'Creative not found.');
+        db.run("UPDATE venue_creatives SET status='ready',updated_at=? WHERE id=? AND venue_id=?",now(),creativeId,venue.id);audit(user.id,venue.id,'creative.ready',{creativeId});return json(res,200,{ok:true});
+      }
       if(method==='POST'&&path==='/api/venue-creatives/request'){
         const {venue,user}=access(req,true),created=now(),creativeId=id();db.run('INSERT INTO venue_creatives(id,venue_id,title,kind,status,starts_at,ends_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',creativeId,venue.id,text(b.title||'Venue promotion','Title',80),'template-request','draft',b.startsAt||null,b.endsAt||null,created,created);audit(user.id,venue.id,'creative.requested',{creativeId});return json(res,201,{ok:true,id:creativeId});
       }
