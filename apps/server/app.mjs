@@ -80,7 +80,11 @@ export function createApplication(options={}){
     const earned=db.get("SELECT COALESCE(SUM(amount_cents),0) value FROM ledger WHERE venue_id=? AND kind!='payout' AND created_at>?",venueId,since).value;
     return {seconds,scans,orders:orders.count,salesCents:orders.cents,balanceCents:balance,earnedCents:earned,dwell:null};
   }
-  function effective(tv,venue){const s=activeSchedule(schedulesFor(venue.id),tv.id,venue.timezone),mix=s?.mix||(tv.mix?parse(tv.mix):venue.mix);return {mix:{...mix,seed:((mix.seed||0)+(tv.rotation_seed||0))%2147483647},theme:s?.theme||tv.theme||venue.theme};}
+  function effective(tv,venue){
+    const s=activeSchedule(schedulesFor(venue.id),tv.id,venue.timezone),profile=db.get('SELECT sm.* FROM tv_profiles tp JOIN saved_mixxes sm ON sm.id=tp.saved_mixx_id WHERE tp.tv_id=? AND sm.venue_id=?',tv.id,venue.id);
+    const profileMix=profile?parse(profile.mix,DEFAULT_MIX):null,mix=s?.mix||profileMix||(tv.mix?parse(tv.mix):venue.mix),playbackMode=profile?.playback_mode||'full';
+    return {mix:{...mix,seed:((mix.seed||0)+(tv.rotation_seed||0))%2147483647},theme:s?.theme||profile?.theme||tv.theme||venue.theme,accent:profile?.accent||venue.accent,playbackMode,showQr:playbackMode==='clean'?false:profile?!!profile.show_qr:true,showVenuePromotions:playbackMode==='clean'?false:profile?!!profile.show_venue_promotions:true,blockedBrands:profile?parse(profile.blocked_brands,[]):[],savedMixxId:profile?.id||null,savedMixxName:profile?.name||null};
+  }
   function manifest(tv,venue){
     const current=effective(tv,venue),catalog=db.all('SELECT * FROM content').map(c=>({...c,worlds:parse(c.worlds,[]),tags:parse(c.tags,[])}));
     const window=Math.floor(now()/(current.mix.minutes*60000));
@@ -90,18 +94,18 @@ export function createApplication(options={}){
     if(prior){const saved=parse(prior.payload);if(saved.fingerprint===fingerprint)return saved;}
     let queue=rotation(catalog,{...current.mix,seed:(current.mix.seed+window)%2147483647},venue.plan);
     if(!config.DEMO_MODE)queue=queue.filter(c=>c.provider!=='demo');
-    const campaigns=candidates.filter(c=>(!c.venue_type||c.venue_type===venue.type)&&Object.keys(current.mix.worlds).includes(c.world));
-    if(venue.plan==='free'&&campaigns.length){
+    const campaigns=candidates.filter(c=>(!c.venue_type||c.venue_type===venue.type)&&Object.keys(current.mix.worlds).includes(c.world)&&!current.blockedBrands.includes(c.brand_id));
+    if(current.playbackMode==='full'&&venue.plan==='free'&&campaigns.length){
       let elapsed=0,lastAd=0,next=0,withAds=[];
       for(const c of queue){withAds.push(c);elapsed+=c.playSeconds;if(elapsed-lastAd>=600){const campaign=campaigns[next++%campaigns.length],ad=catalog.find(a=>a.id===campaign.content_id&&a.sponsor&&entitled(a,venue.plan));if(ad){withAds.push({...ad,world:campaign.world,campaignId:campaign.id,playSeconds:ad.duration});elapsed+=ad.duration;lastAd=elapsed;}}}
       let remain=current.mix.minutes*60;queue=withAds.flatMap(c=>{if(remain<=0)return [];const playSeconds=Math.min(c.playSeconds,remain);remain-=playSeconds;return [{...c,playSeconds}];});
     }
     const manifestId=id(),created=now(),expires=Math.min(created+6*3600000,...queue.map(c=>Math.min(c.rights_until||Infinity,c.campaignId?(campaigns.find(a=>a.id===c.campaignId)?.ends_at||Infinity):Infinity)));
     const publicItems=queue.map((c,index)=>({index,contentId:c.id,campaignId:c.campaignId||null,campaignName:campaigns.find(a=>a.id===c.campaignId)?.name||null,brandId:campaigns.find(a=>a.id===c.campaignId)?.brand_id||null,title:c.title,world:c.world,duration:c.duration,playSeconds:c.playSeconds,cacheKey:`${c.provider}:${c.asset_id}:${c.resolution}`,url:c.provider==='demo'?'/demo/sample.mp4':bunnyUrl(c.asset_id,c.resolution,config,Math.floor(expires/1000)),demo:c.provider==='demo'}));
-    const result={id:manifestId,fingerprint,tvId:tv.id,tvName:tv.name,venueName:venue.name,venueLocation:venue.location||null,theme:current.theme,accent:venue.accent,mix:current.mix,createdAt:created,expiresAt:expires,items:publicItems};
+    const result={id:manifestId,fingerprint,tvId:tv.id,tvName:tv.name,venueName:venue.name,venueLocation:venue.location||null,theme:current.theme,accent:current.accent,mix:current.mix,savedMixxId:current.savedMixxId,savedMixxName:current.savedMixxName,playbackMode:current.playbackMode,showQr:current.showQr,showVenuePromotions:current.showVenuePromotions,blockedBrands:current.blockedBrands,createdAt:created,expiresAt:expires,items:publicItems};
     transaction(()=>{
       db.run('INSERT INTO manifests VALUES(?,?,?,?,?)',manifestId,tv.id,JSON.stringify(result),expires,created);
-      const codes=new Map();for(const item of publicItems){const key=`${item.contentId}:${item.campaignId}`;if(!codes.has(key)){const code=token(9);db.run('INSERT INTO qr_links VALUES(?,?,?,?,?,?,?)',code,venue.id,tv.id,item.contentId,item.campaignId,manifestId,expires);codes.set(key,code);}item.qrUrl=`${config.APP_ORIGIN}/r/${codes.get(key)}`;item.qrImage=`/qr/${codes.get(key)}.svg`;}
+      if(current.showQr){const codes=new Map();for(const item of publicItems){const key=`${item.contentId}:${item.campaignId}`;if(!codes.has(key)){const code=token(9);db.run('INSERT INTO qr_links VALUES(?,?,?,?,?,?,?)',code,venue.id,tv.id,item.contentId,item.campaignId,manifestId,expires);codes.set(key,code);}item.qrUrl=`${config.APP_ORIGIN}/r/${codes.get(key)}`;item.qrImage=`/qr/${codes.get(key)}.svg`;}}
       db.run('UPDATE manifests SET payload=? WHERE id=?',JSON.stringify(result),manifestId);
     });return result;
   }
