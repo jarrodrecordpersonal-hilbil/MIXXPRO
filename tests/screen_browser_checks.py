@@ -51,5 +51,9 @@ def screen_checks(owner, page, player, base, headers, output, passed):
     passed('MIXDATA fits a 390px viewport with scroll-contained playback details')
     page.set_viewport_size({'width':1440,'height':1120})
     page.goto(base)
+    settings=page.locator('nav [data-stream-settings]')
+    expect(settings.locator('summary')).to_be_visible()
+    if not settings.evaluate('(el)=>el.open'):
+        settings.locator('summary').click()
     expect(page.locator('nav [data-screen-activity]')).to_be_visible()
     expect(page.locator('nav [data-screen-activity]')).to_have_text('MIXDATA')
