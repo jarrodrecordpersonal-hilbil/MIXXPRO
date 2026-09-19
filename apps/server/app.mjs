@@ -90,10 +90,11 @@ export function createApplication(options={}){
     const window=Math.floor(now()/(current.mix.minutes*60000));
     const candidates=db.all('SELECT * FROM campaigns WHERE active=1 AND starts_at<=? AND ends_at>?',now(),now());
     const venueCreatives=current.showVenuePromotions&&current.playbackMode!=='clean'?db.all("SELECT * FROM venue_creatives WHERE venue_id=? AND status='ready' AND (starts_at IS NULL OR starts_at<=?) AND (ends_at IS NULL OR ends_at>?) ORDER BY updated_at DESC",venue.id,now(),now()):[];
-    const fingerprint=hash(JSON.stringify([current,venue.plan,venue.accent,tv.name,venue.name,venue.location,catalog,candidates,venueCreatives,window]));
+    const activeBlock=current.savedMixxId?db.get('SELECT * FROM programming_blocks WHERE venue_id=? AND saved_mixx_id=? AND active=1 ORDER BY updated_at DESC LIMIT 1',venue.id,current.savedMixxId):db.get('SELECT * FROM programming_blocks WHERE venue_id=? AND saved_mixx_id IS NULL AND active=1 ORDER BY updated_at DESC LIMIT 1',venue.id);
+    const fingerprint=hash(JSON.stringify([current,venue.plan,venue.accent,tv.name,venue.name,venue.location,catalog,candidates,venueCreatives,activeBlock?.id,activeBlock?.updated_at,window]));
     const prior=db.get('SELECT payload FROM manifests WHERE tv_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 1',tv.id,now()+300000);
     if(prior){const saved=parse(prior.payload);if(saved.fingerprint===fingerprint)return saved;}
-    const block=current.savedMixxId?db.get('SELECT * FROM programming_blocks WHERE venue_id=? AND saved_mixx_id=? AND active=1 ORDER BY updated_at DESC LIMIT 1',venue.id,current.savedMixxId):db.get('SELECT * FROM programming_blocks WHERE venue_id=? AND saved_mixx_id IS NULL AND active=1 ORDER BY updated_at DESC LIMIT 1',venue.id);
+    const block=activeBlock;
     const normalizedBase=mixDefinition(current.baseMix),blockMatches=block&&JSON.stringify(mixDefinition(parse(block.mix,DEFAULT_MIX)))===JSON.stringify(normalizedBase);
     let programmingBlockId=null,queue;
     if(blockMatches){
