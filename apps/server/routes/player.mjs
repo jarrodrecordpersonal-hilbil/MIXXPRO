@@ -30,16 +30,25 @@ export async function playerRoutes(context){
         else db.run('UPDATE tvs SET name=?,group_name=? WHERE id=?',text(b.name||tv.name,'TV name',60),text(b.group??tv.group_name,'Group',40,true),tvId);return json(res,200,{ok:true});
       }
       if(method==='POST'&&path==='/api/commands'){
-        const {user,venue}=access(req,true),kind=choice(b.kind,['play','pause','next','shuffle','apply'],'command');
+        const {user,venue}=access(req,true),kind=choice(b.kind,['play','pause','next','shuffle','apply','volume','mute'],'command');
         const all=tvRows(venue.id);const ids=b.ids==='all'?all.map(t=>t.id):b.ids;
         if(!Array.isArray(ids)||!ids.length||ids.length>100)fail(400,'Select at least one TV.');
         const selected=[...new Set(ids)];if(selected.some(t=>!all.some(x=>x.id===t)))fail(404,'One of those TVs does not belong to this venue.');
         const mix=b.mix?mixDefinition(b.mix):null,theme=b.theme?choice(b.theme,THEMES.map(t=>t.id),'theme'):null;
         if(kind==='apply'&&!mix&&!theme)fail(400,'Choose a MIXX or theme first.');
-        transaction(()=>{for(const tvId of selected){const tv=all.find(t=>t.id===tvId);if(kind==='shuffle'){db.run('UPDATE tvs SET rotation_seed=? WHERE id=?',crypto.getRandomValues(new Uint32Array(1))[0]%2147483647,tvId);}
+        let payload={};if(kind==='volume')payload={volume:integer(b.volume,'Player volume',0,100)};if(kind==='mute'){if(typeof b.muted!=='boolean')fail(400,'Choose mute or unmute.');payload={muted:b.muted};}
+        const commands=[];transaction(()=>{for(const tvId of selected){const tv=all.find(t=>t.id===tvId);if(kind==='shuffle'){db.run('UPDATE tvs SET rotation_seed=? WHERE id=?',crypto.getRandomValues(new Uint32Array(1))[0]%2147483647,tvId);}
           if(kind==='apply')db.run('UPDATE tvs SET mix=?,theme=? WHERE id=?',mix?JSON.stringify(mix):(tv.mix?JSON.stringify(tv.mix):null),theme||tv.theme,tvId);
-          enqueue(tvId,kind,{});
-        }});audit(user.id,venue.id,'command.queued',{kind,count:selected.length});return json(res,200,{queued:selected.length,message:'Queued. A TV confirms receipt when it reconnects.'});
+          const created=now(),result=db.run('INSERT INTO commands(tv_id,kind,payload,created_at,expires_at) VALUES(?,?,?,?,?)',tvId,kind,JSON.stringify(payload),created,created+300000);
+          commands.push({id:Number(result.lastInsertRowid),tvId,status:tv.online?'pending':'offline'});
+        }});audit(user.id,venue.id,'command.queued',{kind,count:selected.length});return json(res,200,{queued:selected.length,commands,message:'Queued. Status changes only after the TV reports the result.'});
+      }
+      if(method==='GET'&&path==='/api/commands/status'){
+        const {venue}=access(req),rawIds=(url.searchParams.get('ids')||'').split(',').filter(Boolean);
+        if(!rawIds.length||rawIds.length>100||rawIds.some(v=>!/^\d+$/.test(v)))fail(400,'Choose valid command IDs.');
+        const ids=[...new Set(rawIds.map(Number))],all=tvRows(venue.id),commands=[];
+        for(const commandId of ids){const row=db.get('SELECT c.*,t.name AS tv_name,t.last_seen FROM commands c JOIN tvs t ON t.id=c.tv_id WHERE c.id=? AND t.venue_id=?',commandId,venue.id);if(!row)fail(404,'Command not found.');const payload=parse(row.payload,{});let status=payload.result||null;if(!status){const online=!!row.last_seen&&now()-row.last_seen<45000;status=row.expires_at<=now()||!online?'offline':'pending';}commands.push({id:row.id,tvId:row.tv_id,tvName:row.tv_name,kind:row.kind,status,detail:payload.resultDetail||''});}
+        return json(res,200,{commands});
       }
       if(method==='GET'&&path==='/api/player/state'){
         const {tv,venue}=device(req),current=effective(tv,venue);
@@ -52,8 +61,9 @@ export async function playerRoutes(context){
       }
       if(method==='POST'&&path==='/api/player/ack'){
         const {tv}=device(req);integer(b.id,'Command ID',1,Number.MAX_SAFE_INTEGER);
-        const command=db.get('SELECT id FROM commands WHERE id=? AND tv_id=?',b.id,tv.id);if(!command)fail(404,'Command not found.');
-        transaction(()=>{db.run('UPDATE commands SET ack_at=COALESCE(ack_at,?) WHERE id=? AND tv_id=?',now(),b.id,tv.id);db.run('UPDATE tvs SET last_ack=MAX(last_ack,?) WHERE id=?',b.id,tv.id);});return json(res,200,{ok:true});
+        const command=db.get('SELECT id,payload FROM commands WHERE id=? AND tv_id=?',b.id,tv.id);if(!command)fail(404,'Command not found.');
+        const result=b.status===undefined?'applied':choice(b.status,['applied','blocked'],'command result'),detail=text(b.detail||'','Result detail',160,true),payload={...parse(command.payload,{}),result,resultDetail:detail};
+        transaction(()=>{db.run('UPDATE commands SET payload=?,ack_at=COALESCE(ack_at,?) WHERE id=? AND tv_id=?',JSON.stringify(payload),now(),b.id,tv.id);db.run('UPDATE tvs SET last_ack=MAX(last_ack,?) WHERE id=?',b.id,tv.id);});return json(res,200,{ok:true,status:result});
       }
       if(method==='GET'&&path==='/api/player/manifest'){
         const {tv,venue}=device(req);rateLimit(db,`manifest:${tv.id}`,40,60000);return json(res,200,manifest(tv,venue));

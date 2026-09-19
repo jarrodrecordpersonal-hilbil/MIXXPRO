@@ -87,6 +87,8 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                 page.on('pageerror', lambda error: errors.append(str(error)))
                 player_context = None
                 player = None
+                player2_context = None
+                player2 = None
                 try:
                     page.goto(BASE)
                     page.locator('input[name="name"]').fill('Jordan')
@@ -128,7 +130,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     passed('Weighted My Mix and independent theme persist through real browser requests')
 
                     player_context = p.chromium.launch_persistent_context(str(profile), headless=True,
-                        viewport={'width': 1440, 'height': 900}, args=['--no-sandbox'])
+                        viewport={'width': 1440, 'height': 900}, args=['--no-sandbox','--autoplay-policy=user-gesture-required'])
                     player = player_context.pages[0]
                     player.on('pageerror', lambda error: errors.append(str(error)))
                     player.goto(BASE + '/player/')
@@ -147,6 +149,91 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     player.evaluate('navigator.serviceWorker.ready')
                     wait(player, 'navigator.serviceWorker.controller !== null')
                     passed('Six-digit UI pairing starts actual MP4 playback and native IndexedDB Blob caching')
+                    assert player.locator('.player-sound').count() == 0
+                    expect(player.locator('#sound-activate')).to_be_hidden()
+                    passed('Normal playback has no persistent sound-control strip')
+
+                    # Pair a second real player so remote targeting can prove isolation and group/all behavior.
+                    profile2 = directory / 'player-profile-2'
+                    player2_context = p.chromium.launch_persistent_context(str(profile2), headless=True,
+                        viewport={'width': 1280, 'height': 800}, args=['--no-sandbox','--autoplay-policy=user-gesture-required'])
+                    player2 = player2_context.pages[0]
+                    player2.on('pageerror', lambda error: errors.append(str(error)))
+                    player2.goto(BASE + '/player/')
+                    wait(player2, "/^\\d{6}$/.test(document.getElementById('pair-code').textContent)")
+                    code2 = player2.locator('#pair-code').inner_text()
+                    page.locator('[data-action="pair"]').first.click()
+                    page.locator('dialog input[name="code"]').fill(code2)
+                    page.locator('dialog input[name="name"]').fill('Patio')
+                    page.locator('dialog input[name="group"]').fill('Bar TVs')
+                    with page.expect_response(lambda r: r.url.endswith('/api/tvs/claim')):
+                        page.locator('dialog button[type=submit]').click()
+                    wait(player2, "document.getElementById('video').currentTime>.2&&!document.getElementById('video').paused", timeout=25000)
+
+                    # Selected TV remote: volume changes the actual HTMLMediaElement and does not touch the other TV.
+                    page.locator('[data-action="tv-remote"]').filter(has=page.locator('xpath=..')).first if False else None
+                    cards = page.locator('.tv-card')
+                    main_card = cards.filter(has_text='Main Bar')
+                    main_card.locator('[data-action="tv-remote"]').click()
+                    dialog = page.locator('#dialog')
+                    dialog.locator('[data-player-volume]').fill('35')
+                    dialog.locator('[data-action="audio-volume"]').click()
+                    wait(player, "Math.abs(document.getElementById('video').volume-.35)<.001", timeout=12000)
+                    expect(dialog.locator('[data-audio-status]')).to_contain_text('Applied')
+                    assert abs(player2.locator('#video').evaluate('(v)=>v.volume') - .7) < .001
+                    page.screenshot(path=str(OUT / 'native-remote-audio-desktop.png'), full_page=True)
+                    passed('Selected-TV Player Volume changes actual video.volume without changing another TV')
+
+                    dialog.locator('[data-action="audio-mute"][data-muted="true"]').click()
+                    wait(player, "document.getElementById('video').muted", timeout=12000)
+                    expect(dialog.locator('[data-audio-status]')).to_contain_text('Applied')
+                    dialog.locator('[data-action="audio-mute"][data-muted="false"]').click()
+                    # A browser may require local activation before allowing audible autoplay.
+                    wait(player, "document.getElementById('sound-activate').classList.contains('hidden')===false || document.getElementById('video').muted===false", timeout=12000)
+                    if player.locator('#sound-activate').is_visible():
+                        expect(dialog.locator('[data-audio-status]')).to_contain_text('Blocked')
+                        player.locator('#sound-activate').click()
+                        wait(player, "!document.getElementById('video').muted&&!document.getElementById('video').paused", timeout=12000)
+                        main_card.locator('[data-action="tv-remote"]').click()
+                        dialog = page.locator('#dialog')
+                        dialog.locator('[data-action="audio-mute"][data-muted="false"]').click()
+                    wait(player, "!document.getElementById('video').muted", timeout=12000)
+                    expect(dialog.locator('[data-audio-status]')).to_contain_text('Applied')
+                    assert abs(player.locator('#video').evaluate('(v)=>v.volume') - .35) < .001
+                    passed('Mute/unmute changes actual video.muted and preserves Player Volume, with truthful browser-blocked status')
+
+                    # Group selection targets both authorized Bar TVs.
+                    page.locator('#dialog').get_by_label('Close dialog').click()
+                    page.get_by_role('button', name='Bar TVs').click()
+                    audio = page.locator('.player-audio-remote').first
+                    audio.locator('[data-player-volume]').fill('55')
+                    audio.locator('[data-action="audio-volume"]').click()
+                    wait(player, "Math.abs(document.getElementById('video').volume-.55)<.001", timeout=12000)
+                    wait(player2, "Math.abs(document.getElementById('video').volume-.55)<.001", timeout=12000)
+                    expect(audio.locator('[data-audio-status]')).to_contain_text('Applied')
+                    passed('Group Player Volume affects both authorized group members')
+
+                    # Individual Patio change must not restore/change Main Bar.
+                    page.locator('.tv-card').filter(has_text='Patio').locator('[data-action="tv-remote"]').click()
+                    dialog = page.locator('#dialog')
+                    dialog.locator('[data-player-volume]').fill('80')
+                    dialog.locator('[data-action="audio-volume"]').click()
+                    wait(player2, "Math.abs(document.getElementById('video').volume-.8)<.001", timeout=12000)
+                    assert abs(player.locator('#video').evaluate('(v)=>v.volume') - .55) < .001
+                    page.locator('#dialog').get_by_label('Close dialog').click()
+
+                    # All-TV scope mutes both; volume survives track changes.
+                    page.locator('#all-tvs').check()
+                    audio = page.locator('.player-audio-remote').first
+                    audio.locator('[data-action="audio-mute"][data-muted="true"]').click()
+                    wait(player, "document.getElementById('video').muted", timeout=12000)
+                    wait(player2, "document.getElementById('video').muted", timeout=12000)
+                    page.locator('.tv-card').filter(has_text='Main Bar').locator('[data-action="tv-remote"]').click()
+                    page.locator('#dialog [data-action="quick-command"][data-kind="next"]').click()
+                    player.wait_for_timeout(1500)
+                    assert abs(player.locator('#video').evaluate('(v)=>v.volume') - .55) < .001
+                    assert player.locator('#video').evaluate('(v)=>v.muted')
+                    passed('All-TV mute applies to authorized TVs and audio settings survive track changes')
 
                     page.locator('[data-action="tv-remote"]').first.click()
                     page.locator('[data-action="quick-command"][data-kind="pause"]').click()
@@ -157,6 +244,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     wait(player, "!document.getElementById('video').paused", timeout=12000)
                     passed('Cloud pause and play control the native video element')
                     player.screenshot(path=str(OUT / 'native-player.png'))
+                    player.screenshot(path=str(OUT / 'native-player-audio.png'))
                     credential = player.evaluate("async()=>{const {get}=await import('/player/offline.mjs');return (await get('kv','credential')).value;}")
                     assert credential
                     player_context.set_offline(True)
@@ -176,7 +264,9 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     assert restored == credential
                     assert records(player, 'media') > 0
                     assert records(player, 'events') >= queued
-                    passed('A persistent browser profile restarts offline with its pairing, cached media and outbox intact')
+                    assert abs(player.locator('#video').evaluate('(v)=>v.volume') - .55) < .001
+                    assert player.locator('#video').evaluate('(v)=>v.muted')
+                    passed('A persistent browser profile restarts offline with pairing, cache, outbox and audio preferences intact')
                     player_context.set_offline(False)
                     wait(player, "async()=>{const {all}=await import('/player/offline.mjs');return (await all('events')).length===0;}", timeout=20000)
                     saved = owner.request.get(BASE + '/api/venue', headers=headers).json()
@@ -193,6 +283,8 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), view + ' overflows'
                         if view == 'mixx':
                             page.screenshot(path=str(OUT / 'native-mixx-mobile.png'), full_page=True)
+                        if view == 'tvs':
+                            page.screenshot(path=str(OUT / 'native-remote-audio-mobile.png'), full_page=True)
                     passed('Eight real venue pages have no horizontal overflow at 390px')
 
                     player_context.set_offline(True)
@@ -216,6 +308,8 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                         pass
                     raise
                 finally:
+                    if player2_context:
+                        player2_context.close()
                     if player_context:
                         player_context.close()
                     browser.close()
