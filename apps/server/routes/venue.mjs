@@ -10,6 +10,19 @@ export async function venueRoutes(context){
       if(method==='GET'&&path==='/api/current-mix'){
         const {venue}=access(req);return json(res,200,{mix:venue.mix,theme:venue.theme,accent:venue.accent});
       }
+      if(method==='GET'&&path==='/api/environments'){
+        const {venue}=access(req);
+        const environments=db.all("SELECT * FROM curated_environments WHERE status='published' ORDER BY updated_at DESC").map(x=>({id:x.id,name:x.name,description:x.description,mix:parse(x.mix,DEFAULT_MIX),theme:x.theme,accent:x.accent,playbackMode:x.playback_mode,showQr:!!x.show_qr,showVenuePromotions:!!x.show_venue_promotions,version:x.version}));
+        const assignments=db.all("SELECT te.tv_id AS tvId,te.environment_id AS environmentId,ce.name,ce.version FROM tv_environments te LEFT JOIN curated_environments ce ON ce.id=te.environment_id WHERE te.tv_id IN (SELECT id FROM tvs WHERE venue_id=? AND revoked=0)",venue.id);
+        return json(res,200,{environments,assignments});
+      }
+      if(method==='POST'&&path.startsWith('/api/tvs/')&&path.endsWith('/environment')){
+        const {venue,user}=access(req,true),tvId=path.split('/')[3],tv=tvRows(venue.id).find(t=>t.id===tvId);if(!tv)fail(404,'TV not found.');
+        if(b.environmentId===null){db.run('DELETE FROM tv_environments WHERE tv_id=?',tvId);audit(user.id,venue.id,'tv.environment.cleared',{tvId});return json(res,200,{ok:true});}
+        const environment=db.get("SELECT id,name,version FROM curated_environments WHERE id=? AND status='published'",text(b.environmentId,'Environment',80));if(!environment)fail(404,'Published environment not found.');
+        db.run('INSERT INTO tv_environments(tv_id,environment_id,updated_at) VALUES(?,?,?) ON CONFLICT(tv_id) DO UPDATE SET environment_id=excluded.environment_id,updated_at=excluded.updated_at',tvId,environment.id,now());
+        audit(user.id,venue.id,'tv.environment.changed',{tvId,environmentId:environment.id,version:environment.version});return json(res,200,{ok:true,environment});
+      }
       if(method==='GET'&&path==='/api/saved-mixxes'){
         const {venue}=access(req);const rows=db.all('SELECT * FROM saved_mixxes WHERE venue_id=? ORDER BY updated_at DESC',venue.id).map(x=>({...x,mix:parse(x.mix,DEFAULT_MIX),blockedBrands:parse(x.blocked_brands,[]),showQr:!!x.show_qr,showVenuePromotions:!!x.show_venue_promotions}));
         return json(res,200,{mixxes:rows});
