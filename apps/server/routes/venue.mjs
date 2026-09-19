@@ -1,6 +1,34 @@
 /** Venue API routes. Authorization remains inside every scoped operation. */
 export async function venueRoutes(context){
-  const {req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg}=context;
+  const {req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,rotation,entitled,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg}=context;
+      const programmingBlock=row=>{
+        if(!row)return null;
+        const catalog=new Map(db.all('SELECT id,title,duration,worlds,tags,status,ready,rights_confirmed,rights_until,premium_only,sponsor,provider,asset_id,resolution,clean FROM content').map(item=>[item.id,item]));
+        const items=parse(row.items,[]).map((slot,index)=>{const item=catalog.get(slot.contentId);return {index,contentId:slot.contentId,title:item?.title||'Unavailable video',world:slot.world,playSeconds:slot.playSeconds,duration:item?.duration||slot.playSeconds,available:!!item};});
+        return {id:row.id,savedMixxId:row.saved_mixx_id||null,mix:parse(row.mix,DEFAULT_MIX),targetSeconds:row.target_seconds,durationSeconds:row.duration_seconds,itemCount:items.length,items,createdAt:row.created_at,updatedAt:row.updated_at};
+      };
+      if(method==='GET'&&path==='/api/programming-blocks/current'){
+        const {venue}=access(req),savedMixxId=url.searchParams.get('savedMixxId');
+        const row=savedMixxId?db.get('SELECT * FROM programming_blocks WHERE venue_id=? AND saved_mixx_id=? AND active=1 ORDER BY updated_at DESC LIMIT 1',venue.id,savedMixxId):db.get('SELECT * FROM programming_blocks WHERE venue_id=? AND saved_mixx_id IS NULL AND active=1 ORDER BY updated_at DESC LIMIT 1',venue.id);
+        return json(res,200,{block:programmingBlock(row)});
+      }
+      if(method==='POST'&&path==='/api/programming-blocks'){
+        const {venue,user}=access(req,true),savedMixxId=b.savedMixxId?text(b.savedMixxId,'Saved MIXX',80):null;
+        let sourceMix=b.mix||venue.mix;
+        if(savedMixxId){const saved=db.get('SELECT mix FROM saved_mixxes WHERE id=? AND venue_id=?',savedMixxId,venue.id);if(!saved)fail(404,'Saved MIXX not found.');sourceMix=parse(saved.mix,DEFAULT_MIX);}
+        const blockMix=mixDefinition({...sourceMix,minutes:180}),catalog=db.all('SELECT * FROM content').map(item=>({...item,worlds:parse(item.worlds,[]),tags:parse(item.tags,[])}));
+        let queue=rotation(catalog,blockMix,venue.plan).filter(item=>!item.sponsor);
+        if(!config.DEMO_MODE)queue=queue.filter(item=>item.provider!=='demo');
+        if(!queue.length)fail(409,'No approved, playable videos match this MIXX yet.');
+        const slots=queue.map(item=>({contentId:item.id,world:item.world,playSeconds:item.playSeconds})),durationSeconds=slots.reduce((sum,item)=>sum+item.playSeconds,0),blockId=id(),created=now();
+        transaction(()=>{
+          if(savedMixxId)db.run('UPDATE programming_blocks SET active=0,updated_at=? WHERE venue_id=? AND saved_mixx_id=? AND active=1',created,venue.id,savedMixxId);
+          else{db.run('UPDATE programming_blocks SET active=0,updated_at=? WHERE venue_id=? AND saved_mixx_id IS NULL AND active=1',created,venue.id);db.run('UPDATE venues SET mix=? WHERE id=?',JSON.stringify(blockMix),venue.id);}
+          db.run('INSERT INTO programming_blocks(id,venue_id,saved_mixx_id,mix,items,target_seconds,duration_seconds,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',blockId,venue.id,savedMixxId,JSON.stringify(blockMix),JSON.stringify(slots),10800,durationSeconds,1,created,created);
+        });
+        audit(user.id,venue.id,'programming_block.built',{blockId,savedMixxId,itemCount:slots.length,durationSeconds});
+        return json(res,201,{ok:true,block:programmingBlock(db.get('SELECT * FROM programming_blocks WHERE id=?',blockId))});
+      }
       if(method==='GET'&&path==='/api/catalog'){
         const {venue}=access(req);
         const rows=db.all("SELECT id,title,worlds,tags,duration,provider,asset_id,resolution,clean,premium_only,sponsor FROM content WHERE status='published' AND ready=1 AND rights_confirmed=1 AND (rights_until IS NULL OR rights_until>?) ORDER BY created_at DESC",now());
