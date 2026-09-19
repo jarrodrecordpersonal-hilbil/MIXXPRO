@@ -100,7 +100,8 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     for primary in ['home','mixx','tvs','revenue']:
                         expect(page.locator(f'[data-page="{primary}"]').first).to_be_visible()
                     assert page.locator('[data-stream-settings]').count() == 1
-                    passed('Streamlined venue shell exposes Home, MIXX, TV, Results with secondary Settings')
+                    assert page.locator('[data-page="billing"]').count() == 0
+                    passed('Streamlined venue shell exposes Home, MIXX, TV, Results without Plan & Installation')
                     session = owner.request.get(BASE + '/api/session').json()
                     venue_id = session['venues'][0]['id']
                     headers = {'X-Venue-Id': venue_id, 'X-CSRF-Token': session['csrf']}
@@ -278,14 +279,14 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     nav(page, 'home')
                     page.screenshot(path=str(OUT / 'native-home-desktop.png'), full_page=True)
                     page.set_viewport_size({'width': 390, 'height': 844})
-                    for view in ['home', 'mixx', 'themes', 'tvs', 'schedule', 'commerce', 'revenue', 'billing']:
+                    for view in ['home', 'mixx', 'themes', 'tvs', 'schedule', 'commerce', 'revenue']:
                         nav(page, view)
                         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), view + ' overflows'
                         if view == 'mixx':
                             page.screenshot(path=str(OUT / 'native-mixx-mobile.png'), full_page=True)
                         if view == 'tvs':
                             page.screenshot(path=str(OUT / 'native-remote-audio-mobile.png'), full_page=True)
-                    passed('Eight real venue pages have no horizontal overflow at 390px')
+                    passed('Seven visible venue pages have no horizontal overflow at 390px')
 
                     player_context.set_offline(True)
                     # Exercise the existing lease-expiry guard using a disposable fixture lease.
