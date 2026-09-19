@@ -21,8 +21,8 @@ test('venue builds a saved three-hour block and player manifest uses it',async()
     }
     const mix={mode:'single',worlds:{golf:'normal'},subcategories:{},minutes:180,seed:7};
     const builtResponse=await fetch(base+'/api/programming-blocks',{method:'POST',headers,body:JSON.stringify({mix})});
-    assert.equal(builtResponse.status,201,await builtResponse.text());
     const built=await builtResponse.json();
+    assert.equal(builtResponse.status,201,JSON.stringify(built));
     assert.equal(built.block.durationSeconds,10800);
     assert.equal(built.block.targetSeconds,10800);
     assert.ok(built.block.itemCount>3);
@@ -35,8 +35,8 @@ test('venue builds a saved three-hour block and player manifest uses it',async()
     const deviceToken='block-device-token';
     app.db.run('INSERT INTO tvs(id,venue_id,name,group_name,token_hash,mix,created_at) VALUES(?,?,?,?,?,?,?)','tv-block',venueId,'Main TV','',hash(deviceToken),JSON.stringify({...mix,minutes:180}),created);
     const manifestResponse=await fetch(base+'/api/player/manifest',{headers:{Authorization:'Bearer '+deviceToken}});
-    assert.equal(manifestResponse.status,200,await manifestResponse.text());
     const manifest=await manifestResponse.json();
+    assert.equal(manifestResponse.status,200,JSON.stringify(manifest));
     assert.equal(manifest.programmingBlockId,built.block.id);
     assert.equal(manifest.items.reduce((sum,item)=>sum+item.playSeconds,0),10800);
     assert.ok(manifest.items.every(item=>item.campaignId===null&&item.venueCreativeId===undefined));
