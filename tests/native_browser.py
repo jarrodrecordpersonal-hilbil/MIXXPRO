@@ -25,9 +25,16 @@ def passed(label):
     print('PASS:', label, flush=True)
 
 def nav(page, name):
-    target = page.locator(f'nav [data-page="{name}"]')
+    target = page.locator(f'[data-page="{name}"]').first
     if not target.is_visible():
-        page.locator('[data-action="menu"]').click()
+        menu = page.locator('[data-action="menu"]')
+        if menu.is_visible():
+            menu.click()
+    if not target.is_visible():
+        settings = target.locator('xpath=ancestor::details[@data-stream-settings]')
+        if settings.count() and not settings.evaluate('(el)=>el.open'):
+            settings.locator('summary').click()
+    expect(target).to_be_visible()
     target.click()
     expect(target).to_have_attribute('aria-current', 'page')
 
@@ -87,7 +94,11 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     page.locator('input[name="email"]').fill('native-' + uuid.uuid4().hex[:10] + '@example.test')
                     page.locator('input[name="password"]').fill('native-browser-test-password-2026')
                     page.locator('[data-form="auth"] button[type=submit]').click()
-                    expect(page.get_by_role('heading', name='Make yourself at home, Jordan.')).to_be_visible()
+                    expect(page.get_by_role('heading', name='Home.')).to_be_visible()
+                    for primary in ['home','mixx','tvs','revenue']:
+                        expect(page.locator(f'[data-page="{primary}"]').first).to_be_visible()
+                    assert page.locator('[data-stream-settings]').count() == 1
+                    passed('Streamlined venue shell exposes Home, MIXX, TV, Results with secondary Settings')
                     session = owner.request.get(BASE + '/api/session').json()
                     venue_id = session['venues'][0]['id']
                     headers = {'X-Venue-Id': venue_id, 'X-CSRF-Token': session['csrf']}
@@ -107,6 +118,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                         page.locator('[data-action="save-mix"]').click()
                     saved = owner.request.get(BASE + '/api/venue', headers=headers).json()
                     assert saved['venue']['mix']['worlds'] == {'golf': 'more', 'bourbon': 'normal', 'travel': 'normal'}
+                    page.locator('[data-stream-settings] summary').click()
                     nav(page, 'themes')
                     page.locator('[data-action="theme"][data-id="speakeasy"]').click()
                     with page.expect_response(lambda r: r.url.endswith('/api/venue') and r.request.method == 'PATCH'):
