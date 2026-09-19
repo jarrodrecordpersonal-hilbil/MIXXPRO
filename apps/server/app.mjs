@@ -5,6 +5,7 @@ import {venueRoutes} from './routes/venue.mjs';
 import {billingRoutes} from './routes/billing.mjs';
 import {publicRoutes} from './routes/public.mjs';
 import {adminRoutes} from './routes/admin.mjs';
+import {gameRoutes} from './routes/games.mjs';
 import {createServer} from 'node:http';
 import {readFileSync,existsSync,statSync,createReadStream} from 'node:fs';
 import {fileURLToPath} from 'node:url';
@@ -133,7 +134,7 @@ export function createApplication(options={}){
       }
       let raw='',b={};if(mutation){raw=await body(req);try{b=raw?JSON.parse(raw):{};}catch{fail(400,'Invalid JSON.');}if(!b||typeof b!=='object'||Array.isArray(b))fail(400,'Expected a JSON object.');}
       const context={req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg};
-      for(const route of [authRoutes,playerRoutes,venueRoutes,billingRoutes,publicRoutes,adminRoutes,screenActivityRoutes]){await route(context);if(res.writableEnded)return;}
+      for(const route of [authRoutes,playerRoutes,venueRoutes,billingRoutes,gameRoutes,publicRoutes,adminRoutes,screenActivityRoutes]){await route(context);if(res.writableEnded)return;}
       if(path.startsWith('/api/'))fail(404,'API route not found.');
       if(method!=='GET'&&method!=='HEAD')fail(405,'Method not allowed.');
       if(path==='/demo/sample.mp4'){
