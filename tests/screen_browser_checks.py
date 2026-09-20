@@ -35,7 +35,11 @@ def screen_checks(owner, page, player, base, headers, output, passed):
     page.locator('#filters [name="city"]').fill('Springfield')
     page.get_by_role('button',name='Show activity',exact=True).click()
     expect(page.locator('tbody tr').first).to_contain_text('Springfield')
-    assert page.locator('tbody tr').first.inner_text().find('Main Bar')>=0
+    # Two real players are active in this fixture; either can legitimately report the
+    # newest progress row. Assert the intended Main Bar playback exists in the
+    # filtered report rather than relying on nondeterministic heartbeat ordering.
+    rows = page.locator('tbody tr')
+    assert any('Main Bar' in rows.nth(i).inner_text() for i in range(rows.count()))
     with page.expect_download() as download_info:
         page.get_by_role('button',name='Export this page · CSV').click()
     assert download_info.value.suggested_filename.startswith('MIXDATA-screen-activity-page-')
