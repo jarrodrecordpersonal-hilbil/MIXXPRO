@@ -306,6 +306,8 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     expect(pick).to_have_text('Picked')
                     response = owner.request.post(BASE + f'/api/admin/games/{event_id}/publish-outcome', headers=headers, data={'matchupId':matchup['id'],'winnerEntryId':matchup['entryAId']})
                     assert response.status == 200, response.text()
+                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'judging','matchupId':matchup['id']})
+                    assert response.status == 200, response.text()
                     response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'results','matchupId':matchup['id']})
                     assert response.status == 200, response.text()
                     wait(home, "document.getElementById('status').textContent.includes('Results are in')", timeout=12000)
