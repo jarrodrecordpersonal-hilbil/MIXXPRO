@@ -294,7 +294,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     expect(home.locator('#play')).to_be_visible()
                     event_data = owner.request.get(BASE + '/api/public/games/PROOF26').json()['event']
                     matchup = event_data['matchups'][0]
-                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'predictions','matchupId':matchup['id'],'seconds':30})
+                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'predictions','matchupId':matchup['id'],'seconds':30,'expectedRevision':event_data.get('stateRevision',0)})
                     assert response.status == 200, response.text()
                     wait(player, "document.getElementById('game-phase').textContent==='PREDICTIONS'", timeout=12000)
                     wait(home, "document.getElementById('status').textContent.includes('Make your picks')", timeout=12000)
@@ -306,9 +306,11 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     expect(pick).to_have_text('Picked')
                     response = owner.request.post(BASE + f'/api/admin/games/{event_id}/publish-outcome', headers=headers, data={'matchupId':matchup['id'],'winnerEntryId':matchup['entryAId']})
                     assert response.status == 200, response.text()
-                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'judging','matchupId':matchup['id']})
+                    live_event = owner.request.get(BASE + '/api/public/games/PROOF26').json()['event']
+                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'judging','matchupId':matchup['id'],'expectedRevision':live_event['stateRevision']})
                     assert response.status == 200, response.text()
-                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'results','matchupId':matchup['id']})
+                    judging_event = owner.request.get(BASE + '/api/public/games/PROOF26').json()['event']
+                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'results','matchupId':matchup['id'],'expectedRevision':judging_event['stateRevision']})
                     assert response.status == 200, response.text()
                     wait(home, "document.getElementById('status').textContent.includes('Results are in')", timeout=12000)
                     expect(home.locator('#standings')).to_contain_text('Home Taylor')
