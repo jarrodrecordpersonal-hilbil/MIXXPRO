@@ -21,6 +21,8 @@ export async function gameRoutes(context){
    db.run('INSERT INTO tasting_matchups(id,event_id,round,slot,entry_a_id,entry_b_id) VALUES(?,?,?,?,?,?)',id(),eventId,1,1,entryIds[0],entryIds[1]);
    db.run('INSERT INTO tasting_matchups(id,event_id,round,slot,entry_a_id,entry_b_id) VALUES(?,?,?,?,?,?)',id(),eventId,1,2,entryIds[2],entryIds[3]);
    for(const name of ['Judge Rowan','Judge Ellis'])db.run('INSERT INTO tasting_judges(id,event_id,name) VALUES(?,?,?)',id(),eventId,name);
+   db.run('INSERT INTO tasting_event_operators(event_id,user_id,created_at) VALUES(?,?,?)',eventId,user.id,created);
+   const firstJudge=db.get('SELECT id FROM tasting_judges WHERE event_id=? ORDER BY name LIMIT 1',eventId);if(firstJudge)db.run('INSERT INTO tasting_judge_users(judge_id,user_id,created_at) VALUES(?,?,?)',firstJudge.id,user.id,created);
   });audit(user.id,null,'proof_trials.demo_created',{eventId});return json(res,201,{ok:true,id:eventId,code:'PROOF26'});
  }
  if(method==='POST'&&path.startsWith('/api/public/games/')&&path.endsWith('/link-device')){
@@ -36,14 +38,14 @@ export async function gameRoutes(context){
  }
  if(method==='POST'&&path.startsWith('/api/games/')&&path.endsWith('/phase')){
   const {venue,user}=access(req,true),eventId=path.split('/')[3],event=db.get('SELECT * FROM tasting_events WHERE id=?',eventId);if(!event)fail(404,'Event not found.');
-  if(!db.get('SELECT 1 FROM event_presentations WHERE event_id=? AND venue_id=? AND active=1',eventId,venue.id))fail(403,'Present this event at your venue before controlling it.');
+  if(!db.get('SELECT 1 FROM tasting_event_operators WHERE event_id=? AND user_id=?',eventId,user.id))fail(403,'Event operator access required.');
   const phase=['lobby','predictions','judging','results','complete'].includes(b.phase)?b.phase:null;if(!phase)fail(400,'Choose a valid event phase.');
   let matchupId=null;if(b.matchupId){const m=db.get('SELECT id FROM tasting_matchups WHERE id=? AND event_id=?',text(b.matchupId,'Matchup',80),eventId);if(!m)fail(404,'Matchup not found.');matchupId=m.id;}
   const seconds=b.seconds===undefined?null:Math.max(5,Math.min(3600,Number(b.seconds)||0)),deadline=seconds===null?null:now()+seconds*1000,status=phase==='complete'?'final':'live';db.run('UPDATE tasting_events SET phase=?,phase_deadline=?,active_matchup_id=?,status=?,updated_at=? WHERE id=?',phase,deadline,matchupId,status,now(),eventId);audit(user.id,venue.id,'game.phase.changed',{eventId,phase,matchupId,deadline});return json(res,200,{ok:true,event:eventView(db,db.get('SELECT * FROM tasting_events WHERE id=?',eventId))});
  }
  if(method==='POST'&&path.startsWith('/api/games/')&&path.endsWith('/judge-submit')){
-  const {venue,user}=access(req,true),eventId=path.split('/')[3];if(!db.get('SELECT 1 FROM event_presentations WHERE event_id=? AND venue_id=? AND active=1',eventId,venue.id))fail(403,'This venue is not presenting that event.');
-  const matchup=db.get('SELECT * FROM tasting_matchups WHERE id=? AND event_id=?',text(b.matchupId,'Matchup',80),eventId);if(!matchup)fail(404,'Matchup not found.');const judgeId=text(b.judgeId,'Judge',80);if(!db.get('SELECT id FROM tasting_judges WHERE id=? AND event_id=?',judgeId,eventId))fail(404,'Judge not found.');const winner=text(b.winnerEntryId,'Winner',80);if(![matchup.entry_a_id,matchup.entry_b_id].includes(winner))fail(400,'Winner must be in the matchup.');
+  const {venue,user}=access(req,true),eventId=path.split('/')[3];
+  const matchup=db.get('SELECT * FROM tasting_matchups WHERE id=? AND event_id=?',text(b.matchupId,'Matchup',80),eventId);if(!matchup)fail(404,'Matchup not found.');const judgeId=text(b.judgeId,'Judge',80);if(!db.get('SELECT j.id FROM tasting_judges j JOIN tasting_judge_users ju ON ju.judge_id=j.id WHERE j.id=? AND j.event_id=? AND ju.user_id=?',judgeId,eventId,user.id))fail(403,'Assigned judge access required.');const winner=text(b.winnerEntryId,'Winner',80);if(![matchup.entry_a_id,matchup.entry_b_id].includes(winner))fail(400,'Winner must be in the matchup.');
   db.run('INSERT INTO tasting_judge_submissions(matchup_id,judge_id,winner_entry_id,submitted_at) VALUES(?,?,?,?) ON CONFLICT(matchup_id,judge_id) DO UPDATE SET winner_entry_id=excluded.winner_entry_id,submitted_at=excluded.submitted_at',matchup.id,judgeId,winner,now());audit(user.id,venue.id,'game.judge.submitted',{eventId,matchupId:matchup.id,judgeId});return json(res,200,{ok:true});
  }
  if(method==='GET'&&path.startsWith('/api/public/games/')){
