@@ -38,7 +38,7 @@ export async function venueRoutes(context){
       if(method==='POST'&&/^\/api\/tvs\/[^/]+\/profile$/.test(path)){
         const {venue,user}=access(req,true),tvId=path.split('/')[3],tv=tvRows(venue.id).find(t=>t.id===tvId);if(!tv)fail(404,'TV not found.');
         const saved=db.get('SELECT id FROM saved_mixxes WHERE id=? AND venue_id=?',text(b.savedMixxId,'Saved MIXX',80),venue.id);if(!saved)fail(404,'Saved MIXX not found.');
-        db.run('INSERT INTO tv_profiles(tv_id,saved_mixx_id,updated_at) VALUES(?,?,?) ON CONFLICT(tv_id) DO UPDATE SET saved_mixx_id=excluded.saved_mixx_id,updated_at=excluded.updated_at',tvId,saved.id,now());audit(user.id,venue.id,'tv.profile.changed',{tvId,savedMixxId:saved.id});return json(res,200,{ok:true});
+        transaction(()=>{db.run('INSERT INTO tv_profiles(tv_id,saved_mixx_id,updated_at) VALUES(?,?,?) ON CONFLICT(tv_id) DO UPDATE SET saved_mixx_id=excluded.saved_mixx_id,updated_at=excluded.updated_at',tvId,saved.id,now());db.run('DELETE FROM tv_environments WHERE tv_id=?',tvId);});audit(user.id,venue.id,'tv.profile.changed',{tvId,savedMixxId:saved.id});return json(res,200,{ok:true});
       }
       if(method==='GET'&&path==='/api/venue-creatives'){
         const {venue}=access(req);return json(res,200,{creatives:db.all('SELECT * FROM venue_creatives WHERE venue_id=? ORDER BY updated_at DESC',venue.id)});
