@@ -20,8 +20,14 @@ test('Proof Trials shares one event and scored identity across home and venue pr
   assert.equal(app.db.get('SELECT COUNT(*) n FROM game_participants WHERE event_id=?',eventId).n,1);
   assert.equal(app.db.get('SELECT COUNT(*) n FROM game_participation WHERE participant_id=?',participantId).n,2);
 
-  const event=(await (await fetch(base+'/api/public/games/PROOF26',{headers:{Cookie:gameCookie}})).json()).event,matchup=event.matchups[0];
-  response=await fetch(base+'/api/public/games/PROOF26/predict',{method:'POST',headers:{'Content-Type':'application/json',Cookie:gameCookie},body:JSON.stringify({matchupId:matchup.id,entryId:matchup.entryAId,kind:'bracket'})});assert.equal(response.status,200);
+  const event=(await (await fetch(base+'/api/public/games/PROOF26',{headers:{Cookie:gameCookie}})).json()).event,matchup=event.matchups[0],judge=event.judges[0];
+  response=await fetch(base+'/api/public/games/PROOF26/link-device',{method:'POST',headers:{'Content-Type':'application/json',Cookie:gameCookie},body:'{}'});body=await response.json();assert.equal(response.status,201,JSON.stringify(body));const resumeCode=body.code;
+  response=await fetch(base+'/api/public/games/PROOF26/resume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:resumeCode})});body=await response.json();assert.equal(response.status,200,JSON.stringify(body));const resumedCookie=response.headers.get('set-cookie').split(';')[0];assert.equal(body.participant.id,participantId,'device resume must preserve the scored participant identity');
+  assert.equal(app.db.get('SELECT COUNT(*) n FROM game_participants WHERE event_id=?',eventId).n,1);
+  response=await fetch(base+'/api/games/'+eventId+'/phase',{method:'POST',headers:staffHeaders,body:JSON.stringify({phase:'predictions',matchupId:matchup.id,seconds:60})});body=await response.json();assert.equal(response.status,200,JSON.stringify(body));assert.equal(body.event.phase,'predictions');assert.equal(body.event.activeMatchupId,matchup.id);assert.ok(body.event.phaseDeadline>Date.now());
+  response=await fetch(base+'/api/games/'+eventId+'/judge-submit',{method:'POST',headers:staffHeaders,body:JSON.stringify({matchupId:matchup.id,judgeId:judge.id,winnerEntryId:matchup.entryAId})});assert.equal(response.status,200);
+
+  response=await fetch(base+'/api/public/games/PROOF26/predict',{method:'POST',headers:{'Content-Type':'application/json',Cookie:resumedCookie},body:JSON.stringify({matchupId:matchup.id,entryId:matchup.entryAId,kind:'bracket'})});assert.equal(response.status,200);
   response=await fetch(base+'/api/admin/games/'+eventId+'/publish-outcome',{method:'POST',headers:staffHeaders,body:JSON.stringify({matchupId:matchup.id,winnerEntryId:matchup.entryAId})});body=await response.json();assert.equal(body.standings[0].totalPoints,1);assert.equal(body.standings[0].bracketPoints,1);
   response=await fetch(base+'/api/admin/games/'+eventId+'/publish-outcome',{method:'POST',headers:staffHeaders,body:JSON.stringify({matchupId:matchup.id,winnerEntryId:matchup.entryBId})});body=await response.json();assert.equal(body.standings[0].totalPoints,0,'published correction must deterministically recompute score');
   assert.equal(app.db.get('SELECT revision FROM tasting_outcomes WHERE matchup_id=?',matchup.id).revision,2);
