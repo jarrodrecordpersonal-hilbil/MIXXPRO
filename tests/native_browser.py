@@ -274,6 +274,50 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     assert saved['metrics']['dwell'] is None
                     passed('Reconnection drains the outbox into device-reported playback analytics, not human dwell')
 
+                    # Bourbon Games: real venue TV + real home browser share one authoritative Proof Trials event.
+                    response = owner.request.post(BASE + '/api/admin/games/proof-trials-demo', headers=headers, data={})
+                    assert response.status in (200,201), response.text()
+                    proof = response.json()
+                    event_id = proof['id']
+                    response = owner.request.post(BASE + f'/api/games/{event_id}/present', headers=headers, data={'groupName':'Bar TVs'})
+                    assert response.status == 200, response.text()
+                    wait(player, "!document.getElementById('game-stage').classList.contains('hidden')", timeout=12000)
+                    expect(player.locator('#game-name')).to_contain_text('Proof Trials')
+                    expect(player.locator('#game-join')).to_contain_text('PROOF26')
+                    home_context = browser.new_context(viewport={'width':390,'height':844})
+                    home = home_context.new_page()
+                    home.on('pageerror', lambda error: errors.append(str(error)))
+                    home.goto(BASE + '/games/PROOF26')
+                    expect(home.get_by_role('heading', name='Join the tasting')).to_be_visible()
+                    home.locator('#join-form input[name="name"]').fill('Home Taylor')
+                    home.locator('#join-form button[type="submit"]').click()
+                    expect(home.locator('#play')).to_be_visible()
+                    event_data = owner.request.get(BASE + '/api/public/games/PROOF26').json()['event']
+                    matchup = event_data['matchups'][0]
+                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'predictions','matchupId':matchup['id'],'seconds':30})
+                    assert response.status == 200, response.text()
+                    wait(player, "document.getElementById('game-phase').textContent==='PREDICTIONS'", timeout=12000)
+                    wait(home, "document.getElementById('status').textContent.includes('Make your picks')", timeout=12000)
+                    assert int(player.locator('#game-countdown').inner_text()) > 0
+                    assert int(home.locator('#countdown').inner_text()) > 0
+                    pick = home.locator(f'[data-matchup="{matchup["id"]}"][data-entry="{matchup["entryAId"]}"]')
+                    expect(pick).to_be_visible()
+                    pick.click()
+                    expect(pick).to_have_text('Picked')
+                    response = owner.request.post(BASE + f'/api/admin/games/{event_id}/publish-outcome', headers=headers, data={'matchupId':matchup['id'],'winnerEntryId':matchup['entryAId']})
+                    assert response.status == 200, response.text()
+                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'results','matchupId':matchup['id']})
+                    assert response.status == 200, response.text()
+                    wait(home, "document.getElementById('status').textContent.includes('Results are in')", timeout=12000)
+                    expect(home.locator('#standings')).to_contain_text('Home Taylor')
+                    expect(home.locator('#standings')).to_contain_text('1 pts')
+                    wait(player, "document.getElementById('game-phase').textContent==='RESULTS'", timeout=12000)
+                    expect(player.locator('#game-matchups')).to_contain_text('Published winner')
+                    home.screenshot(path=str(OUT / 'bourbon-games-home-mobile.png'), full_page=True)
+                    player.screenshot(path=str(OUT / 'bourbon-games-tv-results.png'), full_page=True)
+                    home_context.close()
+                    passed('Bourbon Games synchronizes one Proof Trials event across a venue TV and home player with explainable scoring')
+
                     screen_checks(owner,page,player,BASE,headers,OUT,passed)
                     nav(page, 'home')
                     page.screenshot(path=str(OUT / 'native-home-desktop.png'), full_page=True)
