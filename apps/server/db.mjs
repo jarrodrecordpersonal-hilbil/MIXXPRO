@@ -31,6 +31,11 @@ export function openDatabase(path){
     try{raw.exec(readFileSync(new URL('../../packages/db/migrations/007_bourbon_games_live.sql',import.meta.url),'utf8'));raw.exec('COMMIT');}
     catch(error){raw.exec('ROLLBACK');raw.close();throw error;}
   }
+  if(!raw.prepare('SELECT version FROM migrations WHERE version=8').get()){
+    raw.exec('BEGIN IMMEDIATE');
+    try{raw.exec(readFileSync(new URL('../../packages/db/migrations/008_bourbon_games_authority.sql',import.meta.url),'utf8'));raw.exec('COMMIT');}
+    catch(error){raw.exec('ROLLBACK');raw.close();throw error;}
+  }
   return {raw,get:(sql,...v)=>raw.prepare(sql).get(...v),all:(sql,...v)=>raw.prepare(sql).all(...v),run:(sql,...v)=>raw.prepare(sql).run(...v),
     transaction(fn){raw.exec('BEGIN IMMEDIATE');try{const r=fn();if(r?.then)throw Error('Do not await inside a database transaction');raw.exec('COMMIT');return r;}catch(e){raw.exec('ROLLBACK');throw e;}},close:()=>raw.close()};
 }
