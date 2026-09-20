@@ -40,6 +40,7 @@ test('Proof Trials shares one event and scored identity across home and venue pr
 
   response=await fetch(base+'/api/public/games/PROOF26/predict',{method:'POST',headers:{'Content-Type':'application/json',Cookie:resumedCookie},body:JSON.stringify({matchupId:matchup.id,entryId:matchup.entryAId,kind:'bracket'})});assert.equal(response.status,200);
   response=await fetch(base+'/api/admin/games/'+eventId+'/publish-outcome',{method:'POST',headers:staffHeaders,body:JSON.stringify({matchupId:matchup.id,winnerEntryId:matchup.entryAId})});body=await response.json();assert.equal(body.standings[0].totalPoints,1);assert.equal(body.standings[0].bracketPoints,1);
+  response=await fetch(base+'/api/public/games/PROOF26/predict',{method:'POST',headers:{'Content-Type':'application/json',Cookie:resumedCookie},body:JSON.stringify({matchupId:matchup.id,entryId:matchup.entryBId,kind:'bracket'})});assert.equal(response.status,409,'published matchup predictions must remain locked even while a later round is active');
   response=await fetch(base+'/api/admin/games/'+eventId+'/publish-outcome',{method:'POST',headers:staffHeaders,body:JSON.stringify({matchupId:matchup.id,winnerEntryId:matchup.entryBId})});body=await response.json();assert.equal(body.standings[0].totalPoints,0,'published correction must deterministically recompute score');
   assert.equal(app.db.get('SELECT revision FROM tasting_outcomes WHERE matchup_id=?',matchup.id).revision,2);
  }finally{await app.close();}
