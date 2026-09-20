@@ -1,5 +1,6 @@
 """Real UI coverage for environment/profile switching on disposable demo TVs."""
 import json
+import re
 from playwright.sync_api import expect
 
 
@@ -65,7 +66,7 @@ def environment_checks(owner, page, player, player2, player_context, base, heade
     apply_profile('full')
     for target in [player, player2]:
         expect(target.locator('#qr-box')).to_be_visible()
-        assert target.locator('#qr').get_attribute('src') not in (None, '', 'undefined')
+        expect(target.locator('#qr')).to_have_attribute('src', re.compile(r'^(?!undefined$).+'))
     assert abs(player.locator('#video').evaluate('(v)=>v.volume') - .55) < .001
     assert player.locator('#video').evaluate('(v)=>v.muted')
     passed('No Ads honors QR-off and Full MIXX restores QR without changing audio or the selected programming mix')
