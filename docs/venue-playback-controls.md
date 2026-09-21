@@ -54,3 +54,11 @@ Venue-facing workflow is intentionally minimal: **Upload Ad** or **Make One For 
 ## Playout contract
 
 The server-side programmer owns ordering, pacing, transitions, ad pods, frequency caps, competitive separation, backfill, rights filtering and rolling manifests. Players cache and execute manifests; venues do not stitch video blocks.
+
+## Curator workflow
+
+The existing Admin screen includes Curated environments. Curators create a private draft, choose weighted worlds and optional topics, set playback policy and appearance, and preview eligible programming for a venue before publication. The preview uses the same rotation, campaign exclusion, and promotion rules as the TV manifest. It does not assign a screen, issue a manifest/QR link, or record a playback. Screen schedules and shuffle settings are excluded from this editorial preview and can change the live order.
+
+Editing a published environment stays in the editor until **Publish update** is selected. Publication updates the existing environment ID, increments its version, and reaches assigned online players on their next state poll; paired TVs and audio preferences remain intact. Offline players retain their authorized cached manifest until reconnecting. **Withdraw environment** returns assigned screens to their saved-profile or venue fallback. Drafts and withdrawn environments can be edited and explicitly published again.
+
+All curator operations require platform administrator access. Edits require the loaded version and fail with a conflict if another curator has changed or withdrawn it. Revision and audit writes commit together. The editor supports desktop and 390px mobile browsers. There is no scheduled publication editor in this increment; existing screen schedules still provide time-based mix/theme overrides.
