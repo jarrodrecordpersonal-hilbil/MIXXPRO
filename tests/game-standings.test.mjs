@@ -34,7 +34,7 @@ test('TV, phone and publication responses share bracket and judge scores before 
   assert.ok((await snapshot()).standings.every(row=>row.totalPoints===0),'phones keep unpublished judge choices private');
   assert.ok((await tv()).game.standings.every(row=>row.points===0),'TVs keep unpublished judge choices private');
   for(const [winner,expected] of [[match.entryAId,[['Alex',2],['Casey',1],['Blair',0]]],[match.entryBId,[['Casey',2],['Alex',1],['Blair',1]]]]){
-    const published=(await request('/api/admin/games/'+created.id+'/publish-outcome',{matchupId:match.id,winnerEntryId:winner},headers)).body;
+    const published=(await request('/api/admin/games/'+created.id+'/publish-outcome',{matchupId:match.id,winnerEntryId:winner,expectedRevision:(await snapshot()).event.outcomes.find(o=>o.matchupId===match.id)?.revision||0},headers)).body;
     const phone=await snapshot(),screen=await tv();
     assert.deepEqual(phone.standings.map(row=>[row.name,row.totalPoints]),expected);
     assert.deepEqual(published.standings,phone.standings);

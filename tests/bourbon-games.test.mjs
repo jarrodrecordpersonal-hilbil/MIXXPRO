@@ -47,9 +47,9 @@ test('Proof Trials shares one event and scored identity across home and venue pr
   const resultsState=(await (await fetch(base+'/api/public/games/PROOF26',{headers:{Cookie:resumedCookie}})).json()).event;
   response=await fetch(base+'/api/games/'+eventId+'/phase',{method:'POST',headers:staffHeaders,body:JSON.stringify({phase:'predictions',matchupId:matchup.id,seconds:60,expectedRevision:resultsState.stateRevision})});assert.equal(response.status,409,'closed matchup must never reopen even without relying on publication');
 
-  response=await fetch(base+'/api/admin/games/'+eventId+'/publish-outcome',{method:'POST',headers:staffHeaders,body:JSON.stringify({matchupId:matchup.id,winnerEntryId:matchup.entryAId})});body=await response.json();assert.equal(body.standings[0].totalPoints,1);assert.equal(body.standings[0].bracketPoints,1);
+  response=await fetch(base+'/api/admin/games/'+eventId+'/publish-outcome',{method:'POST',headers:staffHeaders,body:JSON.stringify({matchupId:matchup.id,winnerEntryId:matchup.entryAId,expectedRevision:0})});body=await response.json();assert.equal(body.standings[0].totalPoints,1);assert.equal(body.standings[0].bracketPoints,1);
   response=await fetch(base+'/api/public/games/PROOF26/predict',{method:'POST',headers:{'Content-Type':'application/json',Cookie:resumedCookie},body:JSON.stringify({matchupId:matchup.id,entryId:matchup.entryBId,kind:'bracket'})});assert.equal(response.status,409,'published matchup predictions must remain locked even while a later round is active');
-  response=await fetch(base+'/api/admin/games/'+eventId+'/publish-outcome',{method:'POST',headers:staffHeaders,body:JSON.stringify({matchupId:matchup.id,winnerEntryId:matchup.entryBId})});body=await response.json();assert.equal(body.standings[0].totalPoints,0,'published correction must deterministically recompute score');
+  response=await fetch(base+'/api/admin/games/'+eventId+'/publish-outcome',{method:'POST',headers:staffHeaders,body:JSON.stringify({matchupId:matchup.id,winnerEntryId:matchup.entryBId,expectedRevision:1})});body=await response.json();assert.equal(body.standings[0].totalPoints,0,'published correction must deterministically recompute score');
   assert.equal(app.db.get('SELECT revision FROM tasting_outcomes WHERE matchup_id=?',matchup.id).revision,2);
  }finally{await app.close();}
 });

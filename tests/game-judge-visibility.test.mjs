@@ -44,7 +44,7 @@ test('judge choices cannot be inferred or changed through scores before publicat
   assert.equal((await judgeSubmit(matchup,matchup.entryAId)).status,200);
   assert.equal((await predict(matchup.entryBId)).status,409);
   assert.equal((await snapshot()).standings[0].judgePoints,0,'judging does not itself publish the choice');
-  const published=await request('/api/admin/games/'+eventId+'/publish-outcome',{matchupId:matchup.id,winnerEntryId:matchup.entryAId},headers);
+  const published=await request('/api/admin/games/'+eventId+'/publish-outcome',{matchupId:matchup.id,winnerEntryId:matchup.entryAId,expectedRevision:0},headers);
   assert.equal(published.status,200);
   assert.equal(published.body.standings[0].judgePoints,1);
   assert.equal((await snapshot()).standings[0].totalPoints,1);

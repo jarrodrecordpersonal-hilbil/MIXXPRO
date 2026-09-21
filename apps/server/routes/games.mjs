@@ -1,7 +1,7 @@
 import {scoreRows} from '../game-standings.mjs';
 const participantCookie=req=>((req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('mixx_game='))||'').slice(10);
 const participantFor=(db,eventId,raw,hash)=>raw?db.get('SELECT p.id,p.display_name FROM game_participant_credentials c JOIN game_participants p ON p.id=c.participant_id WHERE c.event_id=? AND c.credential_hash=? AND c.revoked_at IS NULL AND p.event_id=?',eventId,hash(raw),eventId):null;
-function eventView(db,event){
+export function eventView(db,event){
  const entries=db.all('SELECT id,seed,name,story FROM tasting_entries WHERE event_id=? ORDER BY seed',event.id);
  const matchups=db.all('SELECT id,round,slot,entry_a_id AS entryAId,entry_b_id AS entryBId FROM tasting_matchups WHERE event_id=? ORDER BY round,slot',event.id);
  const judges=db.all('SELECT id,name FROM tasting_judges WHERE event_id=? ORDER BY name',event.id);
@@ -87,6 +87,9 @@ export async function gameRoutes(context){
  }
  if(method==='POST'&&path.startsWith('/api/admin/games/')&&path.endsWith('/publish-outcome')){
   const user=admin(req),eventId=path.split('/')[4],matchup=db.get('SELECT * FROM tasting_matchups WHERE id=? AND event_id=?',text(b.matchupId,'Matchup',80),eventId);if(!matchup)fail(404,'Matchup not found.');const winner=text(b.winnerEntryId,'Winner',80);if(![matchup.entry_a_id,matchup.entry_b_id].includes(winner))fail(400,'Winner must be in the matchup.');
-  const prior=db.get('SELECT * FROM tasting_outcomes WHERE matchup_id=?',matchup.id),stamp=now();db.run('INSERT INTO tasting_outcomes(matchup_id,winner_entry_id,revision,published_at,corrected_at) VALUES(?,?,?,?,?) ON CONFLICT(matchup_id) DO UPDATE SET winner_entry_id=excluded.winner_entry_id,revision=tasting_outcomes.revision+1,corrected_at=excluded.published_at',matchup.id,winner,prior?prior.revision+1:1,stamp,prior?stamp:null);audit(user.id,null,'game.outcome.published',{eventId,matchupId:matchup.id,corrected:!!prior});return json(res,200,{ok:true,standings:scoreRows(db,eventId)});
+  const prior=db.get('SELECT * FROM tasting_outcomes WHERE matchup_id=?',matchup.id),event=db.get('SELECT * FROM tasting_events WHERE id=?',eventId),stamp=now();
+  if(!Number.isInteger(b.expectedRevision)||b.expectedRevision!==(prior?.revision||0))fail(409,'Result changed. Refresh and review the winner before publishing.');
+  if(!prior&&(event.status!=='live'||!['judging','results'].includes(event.phase)||event.active_matchup_id!==matchup.id))fail(409,'Publish only the active matchup after predictions close.');
+  db.run('INSERT INTO tasting_outcomes(matchup_id,winner_entry_id,revision,published_at,corrected_at) VALUES(?,?,?,?,?) ON CONFLICT(matchup_id) DO UPDATE SET winner_entry_id=excluded.winner_entry_id,revision=tasting_outcomes.revision+1,corrected_at=excluded.published_at',matchup.id,winner,prior?prior.revision+1:1,stamp,prior?stamp:null);audit(user.id,null,'game.outcome.published',{eventId,matchupId:matchup.id,corrected:!!prior});return json(res,200,{ok:true,standings:scoreRows(db,eventId)});
  }
 }
