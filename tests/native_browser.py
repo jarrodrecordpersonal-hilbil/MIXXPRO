@@ -15,6 +15,7 @@ from playwright.sync_api import sync_playwright, expect
 from screen_browser_checks import screen_checks
 from environment_browser_checks import environment_checks
 from curator_browser_checks import curator_checks
+from game_browser_checks import game_checks
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts'
@@ -279,53 +280,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     curator_checks(owner,player,BASE,headers,OUT,passed,nav,wait)
                     environment_checks(owner,page,player,player2,player_context,BASE,headers,OUT,passed,nav,wait)
 
-                    # Bourbon Games: real venue TV + real home browser share one authoritative Proof Trials event.
-                    response = owner.request.post(BASE + '/api/admin/games/proof-trials-demo', headers=headers, data={})
-                    assert response.status in (200,201), response.text()
-                    proof = response.json()
-                    event_id = proof['id']
-                    response = owner.request.post(BASE + f'/api/games/{event_id}/present', headers=headers, data={'groupName':'Bar TVs'})
-                    assert response.status == 200, response.text()
-                    wait(player, "!document.getElementById('game-stage').classList.contains('hidden')", timeout=12000)
-                    expect(player.locator('#game-name')).to_contain_text('Proof Trials')
-                    expect(player.locator('#game-join')).to_contain_text('PROOF26')
-                    home_context = browser.new_context(viewport={'width':390,'height':844})
-                    home = home_context.new_page()
-                    home.on('pageerror', lambda error: errors.append(str(error)))
-                    home.goto(BASE + '/games/PROOF26')
-                    expect(home.get_by_role('heading', name='Join the tasting')).to_be_visible()
-                    home.locator('#join-form input[name="name"]').fill('Home Taylor')
-                    home.locator('#join-form button[type="submit"]').click()
-                    expect(home.locator('#play')).to_be_visible()
-                    event_data = owner.request.get(BASE + '/api/public/games/PROOF26').json()['event']
-                    matchup = event_data['matchups'][0]
-                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'predictions','matchupId':matchup['id'],'seconds':30,'expectedRevision':event_data.get('stateRevision',0)})
-                    assert response.status == 200, response.text()
-                    wait(player, "document.getElementById('game-phase').textContent==='PREDICTIONS'", timeout=12000)
-                    wait(home, "document.getElementById('status').textContent.includes('Make your picks')", timeout=12000)
-                    assert int(player.locator('#game-countdown').inner_text()) > 0
-                    assert int(home.locator('#countdown').inner_text()) > 0
-                    pick = home.locator(f'[data-matchup="{matchup["id"]}"][data-entry="{matchup["entryAId"]}"]')
-                    expect(pick).to_be_visible()
-                    pick.click()
-                    expect(pick).to_have_text('Picked')
-                    response = owner.request.post(BASE + f'/api/admin/games/{event_id}/publish-outcome', headers=headers, data={'matchupId':matchup['id'],'winnerEntryId':matchup['entryAId']})
-                    assert response.status == 200, response.text()
-                    live_event = owner.request.get(BASE + '/api/public/games/PROOF26').json()['event']
-                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'judging','matchupId':matchup['id'],'expectedRevision':live_event['stateRevision']})
-                    assert response.status == 200, response.text()
-                    judging_event = owner.request.get(BASE + '/api/public/games/PROOF26').json()['event']
-                    response = owner.request.post(BASE + f'/api/games/{event_id}/phase', headers=headers, data={'phase':'results','matchupId':matchup['id'],'expectedRevision':judging_event['stateRevision']})
-                    assert response.status == 200, response.text()
-                    wait(home, "document.getElementById('status').textContent.includes('Results are in')", timeout=12000)
-                    expect(home.locator('#standings')).to_contain_text('Home Taylor')
-                    expect(home.locator('#standings')).to_contain_text('1 pts')
-                    wait(player, "document.getElementById('game-phase').textContent==='RESULTS'", timeout=12000)
-                    expect(player.locator('#game-matchups')).to_contain_text('Published winner')
-                    home.screenshot(path=str(OUT / 'bourbon-games-home-mobile.png'), full_page=True)
-                    player.screenshot(path=str(OUT / 'bourbon-games-tv-results.png'), full_page=True)
-                    home_context.close()
-                    passed('Bourbon Games synchronizes one Proof Trials event across a venue TV and home player with explainable scoring')
+                    game_checks(browser,owner,player,BASE,headers,database,OUT,passed,wait,errors)
 
                     screen_checks(owner,page,player,BASE,headers,OUT,passed)
                     nav(page, 'home')

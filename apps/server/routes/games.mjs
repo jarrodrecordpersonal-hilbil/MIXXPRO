@@ -1,3 +1,4 @@
+import {scoreRows} from '../game-standings.mjs';
 const participantCookie=req=>((req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('mixx_game='))||'').slice(10);
 const participantFor=(db,eventId,raw,hash)=>raw?db.get('SELECT p.id,p.display_name FROM game_participant_credentials c JOIN game_participants p ON p.id=c.participant_id WHERE c.event_id=? AND c.credential_hash=? AND c.revoked_at IS NULL AND p.event_id=?',eventId,hash(raw),eventId):null;
 function eventView(db,event){
@@ -6,10 +7,6 @@ function eventView(db,event){
  const judges=db.all('SELECT id,name FROM tasting_judges WHERE event_id=? ORDER BY name',event.id);
  const outcomes=db.all('SELECT o.matchup_id AS matchupId,o.winner_entry_id AS winnerEntryId,o.revision,o.published_at AS publishedAt,o.corrected_at AS correctedAt FROM tasting_outcomes o JOIN tasting_matchups m ON m.id=o.matchup_id WHERE m.event_id=?',event.id);
  return {id:event.id,code:event.code,name:event.name,status:event.status,phase:event.phase||'lobby',phaseDeadline:event.phase_deadline||null,activeMatchupId:event.active_matchup_id||null,stateRevision:event.state_revision||0,scoringVersion:event.scoring_version,entries,matchups,judges,outcomes};
-}
-function scoreRows(db,eventId){
- const participants=db.all('SELECT id,display_name FROM game_participants WHERE event_id=?',eventId),outcomes=new Map(db.all('SELECT o.matchup_id matchupId,o.winner_entry_id winnerEntryId FROM tasting_outcomes o JOIN tasting_matchups m ON m.id=o.matchup_id WHERE m.event_id=?',eventId).map(x=>[x.matchupId,x.winnerEntryId]));
- return participants.map(p=>{const predictions=db.all('SELECT matchup_id matchupId,prediction_kind kind,judge_id judgeId,entry_id entryId FROM game_predictions WHERE participant_id=?',p.id);const bracket=predictions.filter(x=>x.kind==='bracket').reduce((n,x)=>n+(outcomes.get(x.matchupId)===x.entryId?1:0),0);const judge=predictions.filter(x=>x.kind==='judge').reduce((n,x)=>{if(!outcomes.has(x.matchupId))return n;const submission=db.get('SELECT winner_entry_id winner FROM tasting_judge_submissions WHERE matchup_id=? AND judge_id=?',x.matchupId,x.judgeId);return n+(submission?.winner===x.entryId?1:0);},0);return {participantId:p.id,name:p.display_name,bracketPoints:bracket,judgePoints:judge,totalPoints:bracket+judge};}).sort((a,b)=>b.totalPoints-a.totalPoints||a.name.localeCompare(b.name));
 }
 export async function gameRoutes(context){
  const {req,res,path,method,b,db,config,json,audit,transaction,access,admin,id,now,token,hash,fail,text}=context;
