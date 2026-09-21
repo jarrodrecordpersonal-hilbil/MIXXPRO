@@ -5,6 +5,7 @@ import {venueRoutes} from './routes/venue.mjs';
 import {billingRoutes} from './routes/billing.mjs';
 import {publicRoutes} from './routes/public.mjs';
 import {adminRoutes} from './routes/admin.mjs';
+import {gameRoutes} from './routes/games.mjs';
 import {createServer} from 'node:http';
 import {readFileSync,existsSync,statSync,createReadStream} from 'node:fs';
 import {fileURLToPath} from 'node:url';
@@ -134,7 +135,7 @@ export function createApplication(options={}){
       }
       let raw='',b={};if(mutation){raw=await body(req);try{b=raw?JSON.parse(raw):{};}catch{fail(400,'Invalid JSON.');}if(!b||typeof b!=='object'||Array.isArray(b))fail(400,'Expected a JSON object.');}
       const context={req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg};
-      for(const route of [authRoutes,playerRoutes,venueRoutes,billingRoutes,publicRoutes,adminRoutes,screenActivityRoutes]){await route(context);if(res.writableEnded)return;}
+      for(const route of [authRoutes,playerRoutes,venueRoutes,billingRoutes,gameRoutes,publicRoutes,adminRoutes,screenActivityRoutes]){await route(context);if(res.writableEnded)return;}
       if(path.startsWith('/api/'))fail(404,'API route not found.');
       if(method!=='GET'&&method!=='HEAD')fail(405,'Method not allowed.');
       if(path==='/demo/sample.mp4'){
@@ -143,8 +144,8 @@ export function createApplication(options={}){
         if(match){start=Number(match[1]);end=match[2]?Number(match[2]):end;if(start>end||end>=size){res.writeHead(416,{'Content-Range':`bytes */${size}`});return res.end();}status=206;res.setHeader('Content-Range',`bytes ${start}-${end}/${size}`);}
         res.writeHead(status,{'Content-Type':'video/mp4','Content-Length':end-start+1,'Accept-Ranges':'bytes','Cache-Control':'private, max-age=60'});if(method==='HEAD')return res.end();return createReadStream(file,{start,end}).pipe(res);
       }
-      const files={'/curator-environments.mjs':'apps/web/public/curator-environments.mjs','/polish.mjs':'apps/web/public/polish.mjs','/venue-streamline.mjs':'apps/web/public/venue-streamline.mjs','/venue-streamline.css':'apps/web/public/venue-streamline.css','/playback-controls.mjs':'apps/web/public/playback-controls.mjs','/screens':'apps/web/screens/index.html','/screens/app.mjs':'apps/web/screens/app.mjs','/screens/style.css':'apps/web/screens/style.css','/screens-link.mjs':'apps/web/screens/link.mjs','/app.mjs':'apps/web/public/app.mjs','/style.css':'apps/web/public/style.css','/player/player.mjs':'apps/player/public/player.mjs','/player/offline.mjs':'apps/player/public/offline.mjs','/player/sw.js':'apps/player/public/sw.js','/player/manifest.webmanifest':'apps/player/public/manifest.webmanifest','/shared/domain.mjs':'packages/domain/src/runtime.mjs','/icon.svg':'apps/web/public/icon.svg','/public.mjs':'apps/web/public/public.mjs'};
-      const file=files[path]||(path==='/player'||path==='/player/'?'apps/player/public/index.html':/^\/r\/[A-Za-z0-9_-]+$/.test(path)?'apps/web/public/public.html':path==='/'||['/mixx','/tvs','/themes','/revenue','/admin','/brands','/billing','/schedule','/commerce'].includes(path)?'apps/web/public/index.html':null);
+      const files={'/curator-environments.mjs':'apps/web/public/curator-environments.mjs','/polish.mjs':'apps/web/public/polish.mjs','/venue-streamline.mjs':'apps/web/public/venue-streamline.mjs','/venue-streamline.css':'apps/web/public/venue-streamline.css','/playback-controls.mjs':'apps/web/public/playback-controls.mjs','/screens':'apps/web/screens/index.html','/screens/app.mjs':'apps/web/screens/app.mjs','/screens/style.css':'apps/web/screens/style.css','/screens-link.mjs':'apps/web/screens/link.mjs','/app.mjs':'apps/web/public/app.mjs','/style.css':'apps/web/public/style.css','/player/player.mjs':'apps/player/public/player.mjs','/player/offline.mjs':'apps/player/public/offline.mjs','/player/sw.js':'apps/player/public/sw.js','/player/manifest.webmanifest':'apps/player/public/manifest.webmanifest','/shared/domain.mjs':'packages/domain/src/runtime.mjs','/icon.svg':'apps/web/public/icon.svg','/public.mjs':'apps/web/public/public.mjs','/games.mjs':'apps/web/public/games.mjs'};
+      const file=files[path]||(path==='/player'||path==='/player/'?'apps/player/public/index.html':/^\/r\/[A-Za-z0-9_-]+$/.test(path)?'apps/web/public/public.html':/^\/games\/[A-Za-z0-9_-]+$/.test(path)?'apps/web/public/games.html':path==='/'||['/mixx','/tvs','/themes','/revenue','/admin','/brands','/billing','/schedule','/commerce'].includes(path)?'apps/web/public/index.html':null);
       if(!file)fail(404,'Page not found.');
       const mime={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
       res.writeHead(200,{'Content-Type':mime[extname(file)]||'text/plain','Cache-Control':'no-cache'});return res.end(method==='HEAD'?'':readFileSync(resolve(ROOT,file)));
