@@ -6,7 +6,7 @@
 export const PRIMARY_PAGES = Object.freeze(['home', 'mixx', 'tvs', 'revenue']);
 const LABELS = Object.freeze({home: 'Home', mixx: 'MIXX', tvs: 'TV', revenue: 'Results'});
 const SECONDARY_LABELS = Object.freeze({
-  themes: 'TV appearance', schedule: 'Schedule', commerce: 'Venue promotions',
+  themes: 'TV appearance', schedule: 'Schedule', commerce: 'My Billboard',
   games: 'Bourbon Games', billing: 'Plan & installation', admin: 'MIXXWAVE Admin', brands: 'Brand reports',
 });
 const INTERACTIVE_CONTENT = 'video, audio, iframe, canvas, form, input, select, textarea, button, a[href], [data-action], [role="button"], [contenteditable]';
