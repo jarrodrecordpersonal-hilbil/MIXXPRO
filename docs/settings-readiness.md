@@ -29,9 +29,11 @@ Production still needs an event setup and host-assignment workflow before an ope
 
 ## Verification
 
-- Syntax/terminology check and 195 automated tests.
-- Existing 48 native browser checkpoints covering playback, offline behavior, live event hosting/scoring, consumer accounts, store teams, billboards and MIXDATA.
-- 18 production-mode Settings/music/connection browser checkpoints, including owner/admin/viewer navigation, first-use states, game discovery failure/recovery, a zero-write preview, persisted schedules and in-place edits, failed-save recovery, missing provider configuration, unpaired TV settings, unsaved billboard navigation/reload protection, version notices and 390px layouts.
+- Syntax/terminology check and 198 automated tests.
+- 49 native browser checkpoints covering playback, offline behavior, live event hosting/scoring, consumer accounts, store teams, billboards and MIXDATA.
+- 21 production-mode Settings/music/connection browser checkpoints, including owner/admin/viewer navigation, first-use states, game discovery failure/recovery, a zero-write preview, persisted schedules and in-place edits, failed-save recovery, missing provider configuration, unpaired TV settings, unsaved billboard navigation/reload protection, version notices and 390px layouts.
 - Desktop and phone screenshots inspected for the Billboard editor, Schedule empty state/editor/saved cards, Games preview and standalone activation pages; desktop screenshots also cover playback settings and the update notice. The Schedule editor keeps Save and Cancel visible on phones.
+
+The first-use Home now shows pairing, current player playback and saved billboard publication separately. Before the first TV is paired, setup takes priority over reports and remote buttons. Save & pair a TV persists the selected venue MIXX before pairing. See [the pilot execution plan](pilot-execution-plan.md) for rollout gates and the retailer quick guide.
 
 All browser acceptance uses disposable local databases and fictional fixture venues. No production events, customers, provider connections or payments are created by these checks. Deployment remains a separate manual Render step.

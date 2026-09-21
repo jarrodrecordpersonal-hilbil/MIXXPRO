@@ -66,7 +66,9 @@ export async function authRoutes(context){
         const user=requireSession(req);if(db.get('SELECT COUNT(*) c FROM members WHERE user_id=? AND role=\'owner\'',user.id).c>=25)fail(409,'Contact support to add more venues.');const v=transaction(()=>createVenue(user.id,b));return json(res,201,{venueId:v.id});
       }
       if(method==='GET'&&path==='/api/venue'){
-        const {venue,role}=access(req);return json(res,200,{venue,role,tvs:tvRows(venue.id),metrics:summarize(venue.id),schedules:schedulesFor(venue.id),promotions:db.all('SELECT * FROM promotions WHERE venue_id=? ORDER BY created_at DESC',venue.id),contracts:db.all('SELECT * FROM contracts WHERE venue_id=? ORDER BY created_at DESC',venue.id)});
+        const {venue,role}=access(req),stamp=now();
+        const billboards=db.get('SELECT COUNT(*) total,COALESCE(SUM(CASE WHEN p.active=1 AND p.ends_at>? THEN 1 ELSE 0 END),0) published,COALESCE(SUM(CASE WHEN p.active=1 AND p.ends_at>? AND p.starts_at>? THEN 1 ELSE 0 END),0) scheduled FROM venue_billboards b LEFT JOIN promotions p ON p.id=b.promotion_id AND p.venue_id=b.venue_id WHERE b.venue_id=?',stamp,stamp,stamp,venue.id);
+        return json(res,200,{venue,role,setup:{billboards},tvs:tvRows(venue.id),metrics:summarize(venue.id),schedules:schedulesFor(venue.id),promotions:db.all('SELECT * FROM promotions WHERE venue_id=? ORDER BY created_at DESC',venue.id),contracts:db.all('SELECT * FROM contracts WHERE venue_id=? ORDER BY created_at DESC',venue.id)});
       }
       if(method==='PATCH'&&path==='/api/venue'){
         const {venue,user}=access(req,true);const name=b.name===undefined?venue.name:text(b.name,'Venue name',80),theme=b.theme===undefined?venue.theme:choice(b.theme,THEMES.map(t=>t.id),'theme');

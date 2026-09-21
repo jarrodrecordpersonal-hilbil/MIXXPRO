@@ -71,6 +71,12 @@ def billboard_checks(owner, page, player, player2, base, headers, database, out,
         link=owner.request.get(base+'/b/'+code,max_redirects=0)
         assert link.status==302 and link.headers['location']=='https://example.test/billboard-qa'
         passed('One real portrait video plays beside the authorized store billboard and working QR; other TV groups and audio stay unchanged')
+        nav(page,'home')
+        expect(page.locator('[data-setup-step="billboard"]')).to_have_attribute('data-ready','true')
+        expect(page.locator('[data-setup-step="billboard"]')).to_contain_text('1 published')
+        page.screenshot(path=str(out/'pilot-published-home-desktop.png'),full_page=True)
+        nav(page,'commerce')
+        expect(page.get_by_label('Headline',exact=True)).to_have_value(title)
 
         page.get_by_label('Headline',exact=True).fill('The next store discovery.')
         page.get_by_role('button',name='Save draft',exact=True).click()

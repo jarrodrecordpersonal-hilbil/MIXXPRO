@@ -142,8 +142,9 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     player.goto(BASE + '/player/')
                     wait(player, "/^\\d{6}$/.test(document.getElementById('pair-code').textContent)")
                     code = player.locator('#pair-code').inner_text()
-                    nav(page, 'tvs')
-                    page.locator('[data-action="pair"]').first.click()
+                    nav(page, 'mixx')
+                    page.locator('[data-action="weight"][data-world="golf"][data-weight="normal"]').click()
+                    page.locator('[data-action="apply-mix"]').click()
                     page.locator('dialog input[name="code"]').fill(code)
                     page.locator('dialog input[name="name"]').fill('Main Bar')
                     page.locator('dialog input[name="group"]').fill('Bar TVs')
@@ -155,6 +156,16 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     player.evaluate('navigator.serviceWorker.ready')
                     wait(player, 'navigator.serviceWorker.controller !== null')
                     passed('Six-digit UI pairing starts actual MP4 playback and native IndexedDB Blob caching')
+                    saved = owner.request.get(BASE+'/api/venue',headers=headers).json()
+                    assert saved['venue']['mix']['worlds']['golf']=='normal'
+                    assert saved['venue']['theme']=='speakeasy'
+                    nav(page,'home')
+                    page.locator('[data-action="refresh-venue"]').click()
+                    expect(page.locator('[data-setup-step="pair"]')).to_have_attribute('data-ready','true')
+                    expect(page.locator('[data-setup-step="play"]')).to_have_attribute('data-ready','true',timeout=20000)
+                    page.screenshot(path=str(OUT/'pilot-playing-home-desktop.png'),full_page=True)
+                    nav(page,'tvs')
+                    passed('Save & pair starts the first TV with the newly selected MIXX and Home reports actual player playback')
                     assert player.locator('.player-sound').count() == 0
                     expect(player.locator('#sound-activate')).to_be_hidden()
                     passed('Normal playback has no persistent sound-control strip')
