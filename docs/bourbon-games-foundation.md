@@ -57,10 +57,12 @@ predictions. Starting a fresh anonymous browser is not identity verification.
 - The inherited native suite still verifies real video, pairing, audio,
   cached/offline playback, profiles, environments and telemetry.
 
-Operator controls and judge-prediction entry are API-driven in this increment;
-the phone page provides bracket-prediction buttons. A complete host/judge UI,
-live lobby QR, connection-loss UX, and a restricted non-demo pilot remain later
-work. The existing player poll is five seconds and the phone poll is two seconds;
+The [demo control room](bourbon-games-control-room.md) now provides role-scoped
+host controls, assigned judge submissions, and administrator publication and
+correction. Guest judge-prediction entry remains API-driven; the phone page
+provides bracket-prediction buttons. Live lobby QR, guest connection-loss UX,
+and a restricted non-demo pilot remain later work. The existing player poll is
+five seconds and the phone poll is two seconds;
 there is no frame-perfect synchronization guarantee. Tests use one local server;
 multi-process coordination, capacity and physical devices on separate networks
 have not been validated. There are no prizes, purchases or allocation awards.
