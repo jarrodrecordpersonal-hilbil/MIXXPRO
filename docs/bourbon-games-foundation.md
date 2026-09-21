@@ -88,13 +88,59 @@ operator assignments remain provisioning tasks, not editable in this console.
 Native browser coverage runs these host/judge actions through the actual UI,
 including two conflicting host tabs, failed requests and recovery, desktop and
 390px layout, publication/correction, literal names, and TV restoration. The
-four independent guest browsers still submit judge predictions through the API;
-the guest phone page currently exposes bracket-prediction buttons only.
+four independent guest browsers submit both bracket and judge predictions through
+the phone UI. Saved selections remain highlighted after reload and reconnect.
+A lost save response is reconciled by reading the server, never by automatically
+replaying the mutation. Join, resume and prediction errors appear on the page.
 
-Guest judge-prediction controls, live lobby QR, guest/TV connection-loss UX,
-event/role provisioning, and a restricted non-demo pilot remain later work. A
-dedicated visual pass with real brand and programming assets remains before
-calling the full guest/TV experience polished. The existing player poll is five seconds and the phone poll is two seconds;
-there is no frame-perfect synchronization guarantee. Tests use one local server;
+## Guest phone and venue QR
+
+The phone presents a winner pick plus one prediction per named judge. Its public
+snapshot includes only the authenticated participant's own saved predictions;
+anonymous browsers and revoked credentials cannot retrieve them. A linked device
+uses the same participant and selections. The server clock drives the displayed
+deadline; the server enforces the actual cutoff and active matchup.
+
+The paired TV displays a locally generated game QR when its current profile
+allows QR codes. Clean Screen and explicit QR-off still hide it. The QR opens
+`/games/:eventCode?v=:venueCode`; the venue code is resolved against an active
+presentation before a new QR-origin join is recorded. The image endpoint creates
+no commerce link or consented scan, and its matrix is tested against an independent
+byte-mode QR reference. A forwarded QR does not prove physical attendance.
+
+The phone and TV now share a dark, cream and brass visual treatment, larger type,
+readable pick cards, and an explicit reconnect state. Phone mutations disable when
+disconnected. The TV labels its last event update and hides the join QR until it
+reconnects. The guest page can show final standings even without a joined player.
+
+## Personal accounts and store teams: next layer
+
+The requested model is a personal score plus a store/team score, counting each
+player once, with one store affiliation per player per event. This increment adds
+venue-aware QR entry and retains the existing personal event identity; it does
+not yet add permanent consumer accounts, immutable team membership, or team totals.
+Legacy self-reported location records must not be treated as verified team
+membership or summed as additional participants. A separate team-membership and
+account-linking increment is needed before advertising those capabilities.
+
+## Proposed awards season
+
+The next product direction is a year-long awards season: audiences follow named
+influencer judges through blind tastings, draft bottle rosters, and predict the
+judges' choices. Saved event picks could contribute to personal and store season
+standings, building toward an awards finale. Audience prediction scores and the
+judges' actual tasting results remain separate; fan popularity does not determine
+a blind result. Blind sample identities need explicit concealment and reveal rules.
+
+This is a proposed extension, not implemented functionality. Draft format, season
+scoring, eligibility, and roster locks still need definition. The current meaning
+of audience "betting" is free prediction points, with no cash stakes or prizes.
+
+## Remaining pilot limits
+
+Event/role provisioning and a restricted non-demo pilot remain later work. Final
+brand/footage treatment and physical phone/TV QR scanning still need validation.
+The existing player poll is five seconds and the phone poll is two seconds; there
+is no frame-perfect synchronization guarantee. Tests use one local server;
 multi-process coordination, capacity and physical devices on separate networks
 have not been validated. There are no prizes, purchases or allocation awards.

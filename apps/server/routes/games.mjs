@@ -9,7 +9,14 @@ export function eventView(db,event){
  return {id:event.id,code:event.code,name:event.name,status:event.status,phase:event.phase||'lobby',phaseDeadline:event.phase_deadline||null,activeMatchupId:event.active_matchup_id||null,stateRevision:event.state_revision||0,scoringVersion:event.scoring_version,entries,matchups,judges,outcomes};
 }
 export async function gameRoutes(context){
- const {req,res,path,method,b,db,config,json,audit,transaction,access,admin,id,now,token,hash,fail,text}=context;
+ const {req,res,path,method,url,b,db,config,json,audit,transaction,access,admin,id,now,token,hash,fail,text,qrSvg}=context;
+ if(method==='GET'&&/^\/game-qr\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.svg$/.test(path)){
+  const [, ,code,file]=path.split('/'),venueCode=file.slice(0,-4);
+  const venue=db.get("SELECT v.id FROM venues v JOIN event_presentations p ON p.venue_id=v.id JOIN tasting_events e ON e.id=p.event_id WHERE v.qr_code=? AND e.code=? AND p.active=1 AND e.status IN ('open','live') LIMIT 1",venueCode,code);
+  if(!venue)fail(404,'Event QR is not available.');
+  const svg=qrSvg(`${config.APP_ORIGIN}/games/${code}?v=${venueCode}`).replace('Venue QR code','Join Bourbon Games');
+  res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store'});return res.end(svg);
+ }
  if(method==='POST'&&path==='/api/admin/games/proof-trials-demo'){
   const user=admin(req);if(!config.DEMO_MODE)fail(403,'Proof Trials fixtures are available only in demo mode.');
   const existing=db.get("SELECT id,code FROM tasting_events WHERE code='PROOF26'");if(existing)return json(res,200,{ok:true,...existing});
@@ -60,16 +67,20 @@ export async function gameRoutes(context){
  if(method==='GET'&&path.startsWith('/api/public/games/')){
   const code=path.split('/')[4],event=db.get("SELECT * FROM tasting_events WHERE code=? AND status!='draft'",code);if(!event)fail(404,'Event not found.');
   const raw=participantCookie(req),participant=participantFor(db,event.id,raw,hash);
-  return json(res,200,{event:eventView(db,event),participant,standings:scoreRows(db,event.id),scoring:{bracket:'1 point for each published matchup winner predicted correctly.',judge:'1 point for each named judge choice predicted correctly, after the matchup result is published.'}});
+  const predictions=participant?db.all('SELECT p.matchup_id AS matchupId,p.prediction_kind AS kind,p.judge_id AS judgeId,p.entry_id AS entryId,p.submitted_at AS submittedAt FROM game_predictions p JOIN tasting_matchups m ON m.id=p.matchup_id WHERE p.participant_id=? AND m.event_id=? ORDER BY p.matchup_id,p.prediction_kind,p.judge_id',participant.id,event.id):[];
+  const venueCode=url.searchParams.get('v'),venue=venueCode?db.get('SELECT v.id,v.name FROM venues v JOIN event_presentations p ON p.venue_id=v.id WHERE v.qr_code=? AND p.event_id=? AND p.active=1 LIMIT 1',venueCode,event.id):null;
+  return json(res,200,{event:eventView(db,event),participant,predictions,venue,serverTime:now(),standings:scoreRows(db,event.id),scoring:{bracket:'1 point for each published matchup winner predicted correctly.',judge:'1 point for each named judge choice predicted correctly, after the matchup result is published.'}});
  }
  if(method==='POST'&&path.startsWith('/api/public/games/')&&path.endsWith('/join')){
   const code=path.split('/')[4],event=db.get("SELECT * FROM tasting_events WHERE code=? AND status IN ('open','live')",code);if(!event)fail(404,'This event is not open.');
-  const displayName=text(b.name,'Display name',40),kind=b.locationKind==='venue'?'venue':'home',roomKey=kind==='venue'?text(b.roomKey||'','Room',40,true):'home';
+  const linkedVenue=b.venueCode?db.get('SELECT v.id,v.name FROM venues v JOIN event_presentations p ON p.venue_id=v.id WHERE v.qr_code=? AND p.event_id=? AND p.active=1 LIMIT 1',text(b.venueCode,'Venue code',40),event.id):null;
+  if(b.venueCode&&!linkedVenue)fail(409,'This venue is no longer presenting the event. Open the guest page without the venue link to join from home.');
+  const displayName=text(b.name,'Display name',40),kind=linkedVenue||b.locationKind==='venue'?'venue':'home',roomKey=linkedVenue?'event-qr':kind==='venue'?text(b.roomKey||'','Room',40,true):'home';
   let raw=participantCookie(req);if(!raw){raw=token(32);res.setHeader('Set-Cookie',`mixx_game=${raw}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${config.PRODUCTION?'; Secure':''}`);}
   const identity=hash(raw),created=now();let participant=participantFor(db,event.id,raw,hash);
   if(db.get('SELECT 1 FROM game_participant_credentials WHERE event_id=? AND credential_hash=? AND revoked_at IS NOT NULL',event.id,identity))fail(401,'This device no longer has access to this event.');
   if(!participant){const participantId=id();transaction(()=>{db.run('INSERT INTO game_participants(id,event_id,identity_hash,display_name,created_at,last_seen) VALUES(?,?,?,?,?,?)',participantId,event.id,identity,displayName,created,created);db.run('INSERT INTO game_participant_credentials(event_id,credential_hash,participant_id,created_at) VALUES(?,?,?,?)',event.id,identity,participantId,created);});participant=db.get('SELECT * FROM game_participants WHERE id=?',participantId);}else db.run('UPDATE game_participants SET display_name=?,last_seen=? WHERE id=?',displayName,created,participant.id);
-  const venueId=kind==='venue'&&typeof b.venueId==='string'?b.venueId:null;db.run('INSERT INTO game_participation(participant_id,location_kind,venue_id,room_key,last_seen) VALUES(?,?,?,?,?) ON CONFLICT(participant_id,location_kind,room_key) DO UPDATE SET last_seen=excluded.last_seen',participant.id,kind,venueId,roomKey,created);
+  const venueId=linkedVenue?.id||(kind==='venue'&&typeof b.venueId==='string'?b.venueId:null);db.run('INSERT INTO game_participation(participant_id,location_kind,venue_id,room_key,last_seen) VALUES(?,?,?,?,?) ON CONFLICT(participant_id,location_kind,room_key) DO UPDATE SET last_seen=excluded.last_seen',participant.id,kind,venueId,roomKey,created);
   return json(res,200,{participant:{id:participant.id,name:displayName},event:eventView(db,event)});
  }
  if(method==='POST'&&path.startsWith('/api/public/games/')&&path.endsWith('/predict')){

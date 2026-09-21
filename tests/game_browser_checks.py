@@ -56,6 +56,12 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
         present()
         expect(player.locator('#game-stage')).to_be_visible(timeout=12000)
         passed('Host opens the fictional demo, presents it to a TV group and stops presentation without ending the shared event')
+        expect(player.locator('#game-qr-box')).to_be_visible()
+        wait(player, "document.getElementById('game-qr').complete&&document.getElementById('game-qr').naturalWidth>0")
+        qr_path = player.locator('#game-qr').get_attribute('src')
+        assert owner.request.get(base + qr_path).status == 200
+        venue_code = qr_path.split('/')[-1].removesuffix('.svg')
+        player.screenshot(path=str(out / 'bourbon-games-tv-lobby.png'), full_page=True)
         names = ['Home Taylor', 'Venue Morgan', guest_name, 'Home Casey']
         guests = []
         for name in names:
@@ -63,13 +69,24 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
             contexts.append(context)
             page = context.new_page()
             page.on('pageerror', lambda error: errors.append(str(error)))
-            page.goto(base + '/games/PROOF26')
+            page.goto(base + '/games/PROOF26' + ('?v=' + venue_code if name == 'Venue Morgan' else ''))
             expect(page.get_by_role('heading', name='Join the tasting')).to_be_visible()
+            if name == 'Home Taylor':
+                page.locator('#resume summary').click()
+                page.get_by_label('Resume code', exact=True).fill('INVALID-RESUME')
+                page.get_by_role('button', name='Resume my game', exact=True).click()
+                expect(page.locator('#feedback')).to_contain_text('invalid or expired')
             page.locator('#join-form input[name="name"]').fill(name)
             page.locator('#join-form button[type="submit"]').click()
             expect(page.locator('#play')).to_be_visible()
             participant = context.request.get(base + '/api/public/games/PROOF26').json()['participant']
             guests.append((context, page, participant['id']))
+            if name == 'Venue Morgan':
+                expect(page.locator('#venue-context')).to_contain_text('Joining through')
+                with sqlite3.connect(database) as connection:
+                    row = connection.execute("SELECT venue_id FROM game_participation WHERE participant_id=? AND room_key='event-qr'", (participant['id'],)).fetchone()
+                    assert row and row[0] == headers['X-Venue-Id']
+        passed('The loaded TV QR joins the same event with verified venue context and invalid resume codes show a recoverable error')
         phase('predictions')
         wait(player, "document.getElementById('game-phase').textContent==='PREDICTIONS'", timeout=12000)
         assert int(player.locator('#game-countdown').inner_text()) > 0
@@ -77,20 +94,55 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
             wait(page, "document.getElementById('status').textContent.includes('Make your picks')", timeout=12000)
             assert int(page.locator('#countdown').inner_text()) > 0
             chosen = matchup['entryAId'] if index in (0, 2) else matchup['entryBId']
-            pick = page.locator(f'[data-matchup="{matchup["id"]}"][data-entry="{chosen}"]')
-            with page.expect_response(lambda r: r.url.endswith('/predict') and r.request.method == 'POST') as accepted:
+            pick = page.locator(f'[data-kind="bracket"][data-matchup="{matchup["id"]}"][data-entry="{chosen}"]')
+            with page.expect_response(lambda r: '/predict' in r.url and r.request.method == 'POST') as accepted:
                 pick.click()
             assert accepted.value.status == 200
             judge_pick = matchup['entryAId'] if index in (0, 1) else matchup['entryBId']
-            response = context.request.post(base + '/api/public/games/PROOF26/predict',
-                data={'matchupId': matchup['id'], 'entryId': judge_pick, 'kind': 'judge', 'judgeId': judge['id']})
-            assert response.status == 200, response.text()
+            expect(pick).to_have_attribute('aria-pressed', 'true')
+            judge_button = page.locator(f'[data-pick][data-kind="judge"][data-judge="{judge["id"]}"][data-entry="{judge_pick}"]')
+            with page.expect_response(lambda r: '/predict' in r.url and r.request.method == 'POST') as saved:
+                judge_button.click()
+            assert saved.value.status == 200, saved.value.text()
+            expect(judge_button).to_have_attribute('aria-pressed', 'true')
             assert page.locator('[data-entry-injected], [data-guest-injected]').count() == 0
             expect(page.locator('#matchups')).to_contain_text(entry_name)
         first_context, home, participant_id = guests[0]
         home.reload()
         expect(home.locator('#play')).to_be_visible()
         assert first_context.request.get(base + '/api/public/games/PROOF26').json()['participant']['id'] == participant_id
+        for kind in ['bracket', 'judge']:
+            button = home.locator(f'[data-pick][data-kind="{kind}"][data-entry="{matchup["entryAId"]}"]' + (f'[data-judge="{judge["id"]}"]' if kind == 'judge' else ''))
+            expect(button).to_have_attribute('aria-pressed', 'true')
+        first_context.set_offline(True)
+        expect(home.locator('#connection')).to_contain_text('Connection lost')
+        assert home.locator('[data-pick]:enabled').count() == 0
+        first_context.set_offline(False)
+        expect(home.locator('#connection')).to_contain_text('Connected')
+        expect(home.locator(f'[data-pick][data-kind="bracket"][data-entry="{matchup["entryAId"]}"]')).to_have_attribute('aria-pressed', 'true')
+        submissions = []
+        def lose_response(route):
+            response = route.fetch()
+            assert response.status == 200
+            submissions.append(1)
+            route.abort()
+        home.route('**/api/public/games/PROOF26/predict', lose_response)
+        home.locator(f'[data-pick][data-kind="bracket"][data-entry="{matchup["entryBId"]}"]').click()
+        expect(home.locator('#feedback')).to_contain_text('Reconnected.', timeout=12000)
+        expect(home.locator(f'[data-pick][data-kind="bracket"][data-entry="{matchup["entryBId"]}"]')).to_have_attribute('aria-pressed', 'true')
+        assert len(submissions) == 1, 'uncertain writes must not be retried'
+        home.unroute('**/api/public/games/PROOF26/predict')
+        home.locator(f'[data-pick][data-kind="bracket"][data-entry="{matchup["entryAId"]}"]').click()
+        expect(home.locator(f'[data-pick][data-kind="bracket"][data-entry="{matchup["entryAId"]}"]')).to_have_attribute('aria-pressed', 'true')
+        home.screenshot(path=str(out / 'bourbon-games-phone-picks.png'), full_page=True)
+        passed('Guest bracket and judge picks survive reload and offline recovery; a lost save response reconciles without replaying the write')
+        player.context.set_offline(True)
+        expect(player.locator('#game-connection')).to_contain_text('reconnecting')
+        expect(player.locator('#game-qr-box')).to_be_hidden()
+        player.context.set_offline(False)
+        expect(player.locator('#game-connection')).to_have_text('Live event', timeout=12000)
+        expect(player.locator('#game-qr-box')).to_be_visible()
+        passed('TV connection loss labels the last event state and restores the join QR after reconnecting')
         assert len(owner.request.get(base + '/api/public/games/PROOF26').json()['standings']) == 4
         response = first_context.request.post(base + f'/api/games/{event_id}/phase', data={'phase': 'complete'})
         assert response.status == 401, 'guest cookies must not grant event control'
@@ -105,6 +157,7 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
         # Keep a choice focused so the second tab preserves its reviewed revision.
         second_host.get_by_role('button', name='Close predictions & start judging', exact=True).focus()
         phase('judging')
+        expect(home.locator('[data-pick]:enabled')).to_have_count(0)
         with second_host.expect_response(lambda r: r.url.endswith('/phase') and r.request.method == 'POST') as conflict:
             second_host.get_by_role('button', name='Close predictions & start judging', exact=True).click()
         assert conflict.value.status == 409
@@ -164,6 +217,7 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
 
         phase('complete')
         expect(player.locator('#game-stage')).to_be_hidden(timeout=12000)
+        assert player.locator('#game-qr').get_attribute('src') is None
         for context, page, pid in guests:
             expect(page.locator('#status')).to_have_text('Final results')
         after = player.evaluate("async()=>{const {get}=await import('/player/offline.mjs');return (await get('kv','manifest')).value;}")
