@@ -195,9 +195,13 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
                 phase('results')
             expected = dict(zip(names, points))
             assert {row['name']: row['totalPoints'] for row in accepted.value.json()['standings']} == expected
-            for context, page, pid in guests:
+            for index, (context, page, pid) in enumerate(guests):
                 for name, total in expected.items():
                     expect(page.locator('#standings > div').filter(has_text=name).locator('b')).to_have_text(str(total) + ' pts')
+                own_score = str(expected[names[index]]) + ' pts'
+                expect(page.locator('#my-score')).to_have_text(own_score)
+                expect(page.locator('#standings [data-self] b')).to_have_text(own_score)
+                expect(page.locator('#standings [data-self]')).to_contain_text(names[index])
                 assert page.locator('[data-entry-injected], [data-guest-injected]').count() == 0
                 expect(page.locator('#standings')).to_contain_text(guest_name)
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), 'guest page overflow'

@@ -40,7 +40,8 @@ function render(data){
   $('join').classList.toggle('hidden',joined||final);$('resume').classList.toggle('hidden',joined);$('play').classList.toggle('hidden',!joined&&!final);
   $('device-tools').classList.toggle('hidden',!joined);
   $('player-name').textContent=data.participant?.display_name||'Guest';
-  $('my-score').textContent=(data.standings.find(row=>row.id===data.participant?.id)?.totalPoints||0)+' pts';
+  $('my-score').textContent=(data.standings.find(row=>row.participantId===data.participant?.id)?.totalPoints||0)+' pts';
+  $('player-strip').classList.toggle('hidden',!joined);
   const key=JSON.stringify([data.event,data.participant,data.predictions,data.standings]);
   if(key!==renderKey){
     renderKey=key;
@@ -54,7 +55,7 @@ function render(data){
       const result=data.event.outcomes.find(o=>o.matchupId===m.id);
       return `<article class="game-panel"><p class="eyebrow">ROUND ${h(m.round)} / MATCH ${h(m.slot)}</p><h2 class="match-title">${h(names.get(m.entryAId))}<em>VERSUS</em>${h(names.get(m.entryBId))}</h2>${result?`<p class="result-callout">Published winner: <strong>${h(names.get(result.winnerEntryId))}</strong>${result.revision>1?' · Corrected result':''}</p>`:''}${joined?picks(m,'bracket','','Who wins the matchup?')+data.event.judges.map(j=>picks(m,'judge',j.id,'Who will '+j.name+' choose?')).join(''):''}</article>`;
     }).join('');
-    $('standings').innerHTML=data.standings.map((row,i)=>`<div ${row.id===data.participant?.id?'data-self':''}><span>${i+1}. ${h(row.name)}</span><b>${h(row.totalPoints)} pts</b></div>`).join('')||'<p class="muted">The field is open. Your name could be first.</p>';
+    $('standings').innerHTML=data.standings.map((row,i)=>`<div ${row.participantId===data.participant?.id?'data-self':''}><span>${i+1}. ${h(row.name)}</span><b>${h(row.totalPoints)} pts</b></div>`).join('')||'<p class="muted">The field is open. Your name could be first.</p>';
   }
   updateClock();
 }
