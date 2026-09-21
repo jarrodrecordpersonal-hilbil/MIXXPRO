@@ -13,3 +13,4 @@ dist/
 .DS_Store
 tests/fixtures/sample.mp4
 __pycache__/
+tests/fixtures/portrait.mp4

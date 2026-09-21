@@ -74,7 +74,7 @@ export async function venueRoutes(context){
         db.run('INSERT INTO promotions VALUES(?,?,?,?,?,?,?,?,?)',id(),venue.id,kind,text(b.title,'Title',80),text(b.description,'Description',200),start,end,1,now());audit(user.id,venue.id,'promotion.created',{kind});return json(res,201,{ok:true});
       }
       if(method==='DELETE'&&/^\/api\/promotions\/[^/]+$/.test(path)){
-        const {venue}=access(req,true);db.run('UPDATE promotions SET active=0 WHERE id=? AND venue_id=?',path.split('/').at(-1),venue.id);return json(res,200,{ok:true});
+        const {venue}=access(req,true);if(db.get('SELECT id FROM venue_billboards WHERE promotion_id=? AND venue_id=?',path.split('/').at(-1),venue.id))fail(409,'Withdraw this promotion from My Billboard.');db.run('UPDATE promotions SET active=0 WHERE id=? AND venue_id=?',path.split('/').at(-1),venue.id);return json(res,200,{ok:true});
       }
       if(method==='GET'&&path==='/api/revenue'){
         const {venue}=access(req);return json(res,200,{metrics:summarize(venue.id),ledger:db.all('SELECT * FROM ledger WHERE venue_id=? ORDER BY created_at DESC LIMIT 200',venue.id),referrals:db.all('SELECT name,created_at FROM venues WHERE referred_by=?',venue.id),qrUrl:`${config.APP_ORIGIN}/r/${venue.qr_code}`,qrImage:`/qr/${venue.qr_code}.svg`,referralUrl:`${config.APP_ORIGIN}/?ref=${venue.referral_code}`,rateConfigured:config.COMMISSION_BPS>0});

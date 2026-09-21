@@ -1,6 +1,6 @@
 # Venue playback controls
 
-The venue UI stays simple. These controls describe the next product layer and are intentionally separate from low-level player/cache controls.
+The venue UI stays simple. Saved playback preferences and My Billboard use the existing venue controls, separately from low-level player/cache controls.
 
 ## Playback modes
 
@@ -47,9 +47,11 @@ Explicitly applying a saved venue MIXX clears that TV's curated-environment assi
 
 The player includes these settings and the environment version in its state-change detection, so changing only a playback setting refreshes its manifest on the next successful state poll. Clean Screen, an explicit QR-off preference, and items without a QR image all hide the QR box and clear its image source. The same behavior applies to persisted manifests during offline playback. A disconnected player receives new settings after reconnecting.
 
-## Venue ad upload
+## My Billboard
 
-Venue-facing workflow is intentionally minimal: **Upload Ad** or **Make One For Me**. Uploaded venue creative is validated/transcoded and enters only that venue's eligible promotion slots. Venues do not assemble blocks or choose exact insertion points.
+The venue portal supports text billboards created from scratch or an editable MIXXWAVE template. Save a private draft, select a TV group and schedule in the venue timezone, then explicitly publish. The player shows the billboard beside portrait editorial video, or below it on a vertical screen. Landscape films keep their full frame. No Ads permits the venue’s own promotions; Clean Screen and the venue-promotion switch suppress them. QR remains independently configurable. See [Venue billboards](venue-billboards.md) for publication, expiry and rollback behavior.
+
+Image uploads, commissioned creative and paid sponsor placements are not part of this release.
 
 ## Playout contract
 

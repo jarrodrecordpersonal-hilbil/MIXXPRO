@@ -62,10 +62,11 @@ test('Production configuration starts locally, keeps private configuration priva
     assert.equal(publicConfig.demo,false);assert.equal(publicConfig.signups,true);assert.equal(publicConfig.googleReady,false);assert.equal(publicConfig.mediaReady,false);
     assert.equal(JSON.stringify(publicConfig).includes(config.APP_SECRET),false);
     assert.equal((await fetch(base+'/api/session')).status,401);
+    for(const path of ['/demo/sample.mp4','/demo/portrait.mp4'])assert.equal((await fetch(base+path)).status,404);
     assert.equal((await fetch(base+'/api/screen-activity?scope=network')).status,401);
     const signup=await fetch(base+'/api/auth/signup',{method:'POST',headers:{'Content-Type':'application/json',Origin:config.APP_ORIGIN},body:'{}'});
     assert.equal(signup.status,400);
-    assert.deepEqual(app.db.all('SELECT version FROM migrations ORDER BY version').map(r=>r.version),[1,2,3,4,5,6,7,8,9,10,11]);
+    assert.deepEqual(app.db.all('SELECT version FROM migrations ORDER BY version').map(r=>r.version),[1,2,3,4,5,6,7,8,9,10,11,12]);
     assert.match((await fetch(base)).headers.get('strict-transport-security'),/max-age=/);
   }finally{await app.close();rmSync(dir,{recursive:true,force:true});}
 });
