@@ -4,23 +4,6 @@ export async function adminRoutes(context){
       if(method==='GET'&&path==='/api/admin'){
         admin(req);return json(res,200,{content:db.all('SELECT * FROM content ORDER BY created_at DESC'),campaigns:db.all('SELECT * FROM campaigns'),contracts:db.all('SELECT c.*,v.name venue_name FROM contracts c JOIN venues v ON v.id=c.venue_id ORDER BY c.created_at DESC'),venues:db.all('SELECT id,name,plan FROM venues'),audit:db.all('SELECT * FROM audit ORDER BY created_at DESC LIMIT 40'),integrations:{bunny:!!(config.BUNNY_API_KEY&&config.BUNNY_CDN_HOST&&config.BUNNY_TOKEN_KEY),r2:!!config.R2_ACCESS_KEY_ID,stripe:!!config.STRIPE_SECRET_KEY,commerce:!!config.COMMERCE_WEBHOOK_SECRET},demo:config.DEMO_MODE});
       }
-      if(method==='GET'&&path==='/api/admin/environments'){
-        admin(req);return json(res,200,{environments:db.all('SELECT * FROM curated_environments ORDER BY updated_at DESC').map(x=>({...x,mix:parse(x.mix,DEFAULT_MIX),blockedBrands:parse(x.blocked_brands,[]),showQr:!!x.show_qr,showVenuePromotions:!!x.show_venue_promotions}))});
-      }
-      if(method==='POST'&&path==='/api/admin/environments'){
-        const user=admin(req),mix=mixDefinition(b.mix),playbackMode=choice(b.playbackMode||'full',['full','no-ads','clean'],'playback mode'),clean=playbackMode==='clean',created=now(),environmentId=id();
-        const blocked=Array.isArray(b.blockedBrands)?[...new Set(b.blockedBrands.map(x=>text(x,'Brand',80)))]:[];
-        db.run('INSERT INTO curated_environments(id,name,description,mix,theme,accent,playback_mode,show_qr,show_venue_promotions,blocked_brands,status,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',environmentId,text(b.name,'Environment name',80),text(b.description||'','Description',240),JSON.stringify(mix),choice(b.theme||'modern-luxury',THEMES.map(t=>t.id),'theme'),text(b.accent||'#c7aa77','Accent',20),playbackMode,clean?0:(b.showQr===false?0:1),clean?0:(b.showVenuePromotions===false?0:1),JSON.stringify(blocked),'draft',1,created,created);
-        audit(user.id,null,'environment.created',{environmentId});return json(res,201,{ok:true,id:environmentId,status:'draft'});
-      }
-      if(method==='POST'&&path.startsWith('/api/admin/environments/')&&path.endsWith('/publish')){
-        const user=admin(req),environmentId=path.split('/')[4],environment=db.get('SELECT * FROM curated_environments WHERE id=?',environmentId);if(!environment)fail(404,'Environment not found.');
-        db.run("UPDATE curated_environments SET status='published',version=version+1,updated_at=? WHERE id=?",now(),environmentId);audit(user.id,null,'environment.published',{environmentId,version:environment.version+1});return json(res,200,{ok:true,id:environmentId,status:'published',version:environment.version+1});
-      }
-      if(method==='POST'&&path.startsWith('/api/admin/environments/')&&path.endsWith('/withdraw')){
-        const user=admin(req),environmentId=path.split('/')[4],environment=db.get('SELECT id FROM curated_environments WHERE id=?',environmentId);if(!environment)fail(404,'Environment not found.');
-        db.run("UPDATE curated_environments SET status='withdrawn',updated_at=? WHERE id=?",now(),environmentId);audit(user.id,null,'environment.withdrawn',{environmentId});return json(res,200,{ok:true,id:environmentId,status:'withdrawn'});
-      }
       if(method==='POST'&&path==='/api/admin/media/import'){
         const user=admin(req),page=integer(b.page??1,'Page',1,10000),response=await bunnyList(config,page);let added=0;
         transaction(()=>{for(const video of response.items||[]){if(db.get('SELECT id FROM content WHERE provider=\'bunny\' AND asset_id=?',video.guid))continue;db.run('INSERT INTO content(id,title,worlds,duration,provider,asset_id,ready,created_at) VALUES(?,?,?,?,?,?,?,?)',id(),String(video.title).slice(0,160),'[]',Math.max(1,Math.min(14400,Math.floor(video.length||1))),'bunny',video.guid,video.status===4?1:0,now());added++;}});audit(user.id,null,'media.import',{added});return json(res,200,{added,totalItems:response.totalItems,page});
