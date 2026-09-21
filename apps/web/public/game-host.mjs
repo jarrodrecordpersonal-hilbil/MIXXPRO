@@ -1,16 +1,17 @@
+import {gamePreview,renderGamePreview} from './game-preview.mjs';
 const h=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const phaseLabels={lobby:'Lobby',predictions:'Predictions open',judging:'Judging',results:'Results',complete:'Complete'};
 const opts=items=>items.map(([value,label])=>`<option value="${h(value)}">${h(label)}</option>`).join('');
 
 export function gameHostPage(){
-  return `<header class="header"><div><div class="eyebrow">BOURBON GAMES</div><h1>Run the tasting.</h1><p>One event, shared by your screens and everyone playing along.</p></div></header><div data-game-host class="game-host"><p role="status" data-host-status aria-live="polite">Loading events…</p><div data-host-content></div></div>`;
+  return `<header class="header"><div><div class="eyebrow">BOURBON GAMES</div><h1>Bourbon Games.</h1><p>Bring the tasting to your TVs. Let guests play along on their phones.</p></div></header><div data-game-host class="game-host"><p role="status" data-host-status aria-live="polite">Loading events…</p><div data-host-content></div></div>`;
 }
 
-export function mountGameHost({root,api,demo,isAdmin}){
-  let events=[],selected='',snapshot=null,busy=false,polling=false,generation=0,disposed=false,connected=false,renderedKey='';
+export function mountGameHost({root,api,demo,isAdmin,onNavigate}){
+  let events=[],selected='',snapshot=null,busy=false,polling=false,generation=0,disposed=false,connected=false,renderedKey='',previewView='phone',previewPick='';
   const content=root.querySelector('[data-host-content]'),status=root.querySelector('[data-host-status]');
   const say=message=>{if(!disposed)status.textContent=message;};
-  const disable=()=>root.querySelectorAll('button,select,input').forEach(el=>el.disabled=busy||(!connected&&el.dataset.hostAction!=='refresh'));
+  const disable=()=>root.querySelectorAll('button,select,input').forEach(el=>{if(el.matches('[data-preview-view],[data-preview-pick],[data-host-nav]'))return;el.disabled=busy||(!connected&&el.dataset.hostAction!=='refresh');});
   const entry=id=>snapshot.event.entries.find(e=>e.id===id)?.name||'Unknown entry';
   const matchupName=m=>`${entry(m.entryAId)} vs ${entry(m.entryBId)}`;
   function form(action,body,label,extra=''){
@@ -19,7 +20,8 @@ export function mountGameHost({root,api,demo,isAdmin}){
   function draw(){
     if(disposed)return;
     const previous=selected;
-    content.innerHTML=`<section class="panel"><div class="section-head"><h2>Choose an event</h2><button type="button" class="btn secondary small" data-host-action="refresh">Refresh</button></div>${events.length?`<label class="field"><span class="label">Event</span><select data-host-event aria-label="Event">${opts(events.map(e=>[e.id,e.name+' · '+phaseLabels[e.phase]]))}</select></label>`:'<p>No events are available yet.</p>'}${demo&&isAdmin?'<button type="button" class="btn secondary" data-host-action="demo">Open fictional demo</button><p class="small">Uses the existing Proof Trials test event. It does not reset completed events.</p>':''}</section><div data-host-event-panel></div>`;
+    content.innerHTML=`<section class="panel"><div class="section-head"><h2>${events.length?'Your available events':connected?'No live event available yet':'Checking available events…'}</h2><button type="button" class="btn secondary small" data-host-action="refresh">Refresh</button></div>${events.length?`<label class="field"><span class="label">Event</span><select data-host-event aria-label="Event">${opts(events.map(e=>[e.id,e.name+' · '+phaseLabels[e.phase]]))}</select></label>`:`<p>${connected?'Published events will appear here. Until an event opens, there is no guest QR or live game to present.':'Checking the event list. You can explore the preview below while it loads.'}</p>${connected?'<p class="small">Live event setup and host assignments are the next step for the pilot. Creating events is not available in this portal yet.</p>':''}<div class="actions section"><button type="button" class="btn secondary" data-host-nav="tvs">Open TV controls</button></div>`}${demo&&isAdmin?'<button type="button" class="btn secondary" data-host-action="demo">Open fictional demo</button><p class="small">Uses the existing Proof Trials test event. It does not reset completed events.</p>':''}</section><div data-host-event-panel></div>${events.length?'':gamePreview()}`;
+    renderGamePreview(root,previewView,previewPick);
     const select=content.querySelector('[data-host-event]');if(select)select.value=previous;
     if(!snapshot){disable();return;}
     const {event:e,capabilities:c,assignedJudges,submissions,lockedMatchupIds,tvGroups,presentations,standings}=snapshot;
@@ -84,6 +86,8 @@ export function mountGameHost({root,api,demo,isAdmin}){
     if(event.target.matches('[data-host-event]')){selected=event.target.value;run(async()=>{},'Event loaded.');}
   });
   root.addEventListener('click',event=>{
+    const preview=event.target.closest('[data-preview-view],[data-preview-pick]');if(preview){if(preview.dataset.previewView)previewView=preview.dataset.previewView;if(preview.dataset.previewPick)previewPick=preview.dataset.previewPick;renderGamePreview(root,previewView,previewPick);return;}
+    const navigation=event.target.closest('[data-host-nav]');if(navigation){onNavigate?.(navigation.dataset.hostNav);return;}
     const button=event.target.closest('[data-host-action]');if(!button||button.disabled)return;
     const action=button.dataset.hostAction;
     if(action==='refresh')return run(async()=>{},'Up to date.');
