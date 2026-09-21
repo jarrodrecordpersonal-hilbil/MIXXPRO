@@ -57,13 +57,21 @@ export async function venueRoutes(context){
       if(method==='POST'&&path==='/api/venue-creatives/request'){
         const {venue,user}=access(req,true),created=now(),creativeId=id();db.run('INSERT INTO venue_creatives(id,venue_id,title,kind,status,starts_at,ends_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',creativeId,venue.id,text(b.title||'Venue promotion','Title',80),'template-request','draft',b.startsAt||null,b.endsAt||null,created,created);audit(user.id,venue.id,'creative.requested',{creativeId});return json(res,201,{ok:true,id:creativeId});
       }
-      if(method==='POST'&&path==='/api/schedules'){
-        const {venue,user}=access(req,true);const mix=mixDefinition(b.mix),theme=choice(b.theme,THEMES.map(t=>t.id),'theme');
+      if((method==='POST'&&path==='/api/schedules')||(method==='PATCH'&&/^\/api\/schedules\/[^/]+$/.test(path))){
+        const {venue,user}=access(req,true);
+        const scheduleId=method==='PATCH'?path.split('/').at(-1):id();
+        if(method==='PATCH'&&!db.get('SELECT id FROM schedules WHERE id=? AND venue_id=?',scheduleId,venue.id))fail(404,'Schedule not found.');
+        const mix=mixDefinition(b.mix),theme=choice(b.theme,THEMES.map(t=>t.id),'theme');
         const name=text(b.name,'Schedule name',80);const time=v=>typeof v==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(v);
         if(!time(b.start)||!time(b.end)||b.start===b.end)fail(400,'Choose different valid start and end times.');
         if(!Array.isArray(b.days)||!b.days.length||b.days.some(d=>!Number.isInteger(d)||d<0||d>6))fail(400,'Choose at least one day.');
         const ids=b.tvIds||[];if(!Array.isArray(ids)||ids.some(t=>!tvRows(venue.id).some(x=>x.id===t)))fail(400,'Select TVs from this venue.');
-        db.run('INSERT INTO schedules VALUES(?,?,?,?,?,?,?,?,?,?,?)',id(),venue.id,name,JSON.stringify([...new Set(b.days)]),JSON.stringify(ids),b.start,b.end,JSON.stringify(mix),theme,1,now());audit(user.id,venue.id,'schedule.created');return json(res,201,{ok:true});
+        if(method==='PATCH'){
+          db.run('UPDATE schedules SET name=?,days=?,tv_ids=?,start_time=?,end_time=?,mix=?,theme=? WHERE id=? AND venue_id=?',name,JSON.stringify([...new Set(b.days)]),JSON.stringify(ids),b.start,b.end,JSON.stringify(mix),theme,scheduleId,venue.id);
+        }else{
+          db.run('INSERT INTO schedules VALUES(?,?,?,?,?,?,?,?,?,?,?)',scheduleId,venue.id,name,JSON.stringify([...new Set(b.days)]),JSON.stringify(ids),b.start,b.end,JSON.stringify(mix),theme,1,now());
+        }
+        audit(user.id,venue.id,method==='PATCH'?'schedule.updated':'schedule.created',{scheduleId});return json(res,method==='PATCH'?200:201,{ok:true,id:scheduleId});
       }
       if(method==='DELETE'&&/^\/api\/schedules\/[^/]+$/.test(path)){
         const {venue}=access(req,true);db.run('DELETE FROM schedules WHERE id=? AND venue_id=?',path.split('/').at(-1),venue.id);return json(res,200,{ok:true});

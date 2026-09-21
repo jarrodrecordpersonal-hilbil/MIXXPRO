@@ -6,7 +6,7 @@
 export const PRIMARY_PAGES = Object.freeze(['home', 'mixx', 'tvs', 'revenue']);
 const LABELS = Object.freeze({home: 'Home', mixx: 'MIXX', tvs: 'TV', revenue: 'Results'});
 const SECONDARY_LABELS = Object.freeze({
-  themes: 'TV appearance', schedule: 'Schedule', commerce: 'My Billboard',
+  schedule: 'Schedule', commerce: 'My Billboard',
   games: 'Bourbon Games', admin: 'MIXXWAVE Admin', brands: 'Brand reports',
 });
 const INTERACTIVE_CONTENT = 'video, audio, iframe, canvas, form, input, select, textarea, button, a[href], [data-action], [role="button"], [contenteditable]';
@@ -21,7 +21,7 @@ function streamlineNav({app,main,sidebar,nav,buttons,page}){if(nav.dataset.strea
 function organizeSettings(panel){
  const items=[...panel.querySelectorAll('button[data-page],a')];
  const categories=[['venue','Venue tools',el=>!['admin','brands'].includes(el.dataset.page)&&!el.dataset.screenActivity&&el.dataset.extension!=='setup'],['reports','Reporting',el=>el.dataset.page==='brands'||!!el.dataset.screenActivity],['network','Network tools',el=>el.dataset.page==='admin'||el.dataset.extension==='setup']];
- const descriptions={themes:'Colors and overlays for your TVs',schedule:'Recurring programming times',commerce:'Your store messages and portrait-video billboards',games:'Available tasting events and an experience preview',admin:'Network content, environments and campaign management',brands:'Reporting for assigned brand campaigns'};
+ const descriptions={schedule:'Recurring programming times',commerce:'Your store messages and portrait-video billboards',games:'Available tasting events and an experience preview',admin:'Network content, environments and campaign management',brands:'Reporting for assigned brand campaigns'};
  const ordered=[];
  for(const [id,label,matches] of categories){const links=items.filter(matches);let heading=panel.querySelector(`[data-settings-group="${id}"]`);if(!links.length){heading?.remove();continue;}if(!heading){heading=document.createElement('p');heading.dataset.settingsGroup=id;heading.className='settings-group-label';heading.textContent=label;}ordered.push(heading,...links);}
  for(const [index,node] of ordered.entries())if(panel.children[index]!==node)panel.insertBefore(node,panel.children[index]||null);

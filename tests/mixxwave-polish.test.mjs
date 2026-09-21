@@ -13,7 +13,7 @@ test('main page presents MIXXWAVE immediately and loads presentation polish',()=
 
 test('polish keeps MIXDATA separate, exposes setup actions and a catalog browser',()=>{
   const script=read('apps/web/public/polish.mjs');
-  for(const copy of ['Choose the MIXX','Pick the look','Connect the TV','Open MIXDATA','Browse videos','Browse available videos'])assert.match(script,new RegExp(copy));
+  for(const copy of ['Choose the MIXX','Connect the TV','Open MIXDATA','Browse videos','Browse available videos'])assert.match(script,new RegExp(copy));
   assert.match(script,/page==='mixdata'/);
   assert.match(script,/location\.href='\/screens'/);
   assert.match(script,/MIXXTANK for venues','MIXXWAVE for venues'/);
