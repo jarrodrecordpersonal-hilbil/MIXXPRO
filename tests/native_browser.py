@@ -13,6 +13,8 @@ import urllib.request
 import uuid
 from playwright.sync_api import sync_playwright, expect
 from screen_browser_checks import screen_checks
+from environment_browser_checks import environment_checks
+from curator_browser_checks import curator_checks
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts'
@@ -274,6 +276,8 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     assert saved['metrics']['dwell'] is None
                     passed('Reconnection drains the outbox into device-reported playback analytics, not human dwell')
 
+                    curator_checks(owner,player,BASE,headers,OUT,passed,nav,wait)
+                    environment_checks(owner,page,player,player2,player_context,BASE,headers,OUT,passed,nav,wait)
                     screen_checks(owner,page,player,BASE,headers,OUT,passed)
                     nav(page, 'home')
                     page.screenshot(path=str(OUT / 'native-home-desktop.png'), full_page=True)

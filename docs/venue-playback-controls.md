@@ -32,7 +32,20 @@ Venues can save multiple named programming profiles, e.g. Main Bourbon, Dinner, 
 - blocked advertiser brands
 - visual theme/accent when explicitly customized
 
-A profile can be applied to one TV, a TV group or the whole venue. Schedules reference a saved profile rather than duplicating all programming rules.
+A profile can be applied to one TV, a TV group or the whole venue. Current schedules store their own mix and theme overrides.
+
+## Switching between environments and saved MIXXes
+
+Explicitly applying a saved venue MIXX clears that TV's curated-environment assignment in the same transaction. An unsuccessful or unauthorized request leaves both selections unchanged. Group/all-TV controls make the same authorized request for each target TV; other TVs are unaffected.
+
+| Action | Effective selection |
+| --- | --- |
+| Choose a published environment | The environment supplies programming and playback settings; the prior saved profile remains available as a fallback. |
+| Apply a saved venue MIXX | The saved profile supplies programming and playback settings; the environment assignment is removed. |
+| Clear or withdraw the environment | The saved profile resumes, or TV/venue defaults apply if none exists. |
+| Run an active schedule | The schedule overrides the mix and theme; playback mode, QR, promotions, and brand exclusions remain those of the selected environment/profile. |
+
+The player includes these settings and the environment version in its state-change detection, so changing only a playback setting refreshes its manifest on the next successful state poll. Clean Screen, an explicit QR-off preference, and items without a QR image all hide the QR box and clear its image source. The same behavior applies to persisted manifests during offline playback. A disconnected player receives new settings after reconnecting.
 
 ## Venue ad upload
 
@@ -41,3 +54,11 @@ Venue-facing workflow is intentionally minimal: **Upload Ad** or **Make One For 
 ## Playout contract
 
 The server-side programmer owns ordering, pacing, transitions, ad pods, frequency caps, competitive separation, backfill, rights filtering and rolling manifests. Players cache and execute manifests; venues do not stitch video blocks.
+
+## Curator workflow
+
+The existing Admin screen includes Curated environments. Curators create a private draft, choose weighted worlds and optional topics, set playback policy and appearance, and preview eligible programming for a venue before publication. The preview uses the same rotation, campaign exclusion, and promotion rules as the TV manifest. It does not assign a screen, issue a manifest/QR link, or record a playback. Screen schedules and shuffle settings are excluded from this editorial preview and can change the live order.
+
+Editing a published environment stays in the editor until **Publish update** is selected. Publication updates the existing environment ID, increments its version, and reaches assigned online players on their next state poll; paired TVs and audio preferences remain intact. Offline players retain their authorized cached manifest until reconnecting. **Withdraw environment** returns assigned screens to their saved-profile or venue fallback. Drafts and withdrawn environments can be edited and explicitly published again.
+
+All curator operations require platform administrator access. Edits require the loaded version and fail with a conflict if another curator has changed or withdrawn it. Revision and audit writes commit together. The editor supports desktop and 390px mobile browsers. There is no scheduled publication editor in this increment; existing screen schedules still provide time-based mix/theme overrides.
