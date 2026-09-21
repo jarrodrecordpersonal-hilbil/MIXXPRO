@@ -39,6 +39,7 @@ def billboard_checks(owner, page, player, player2, base, headers, database, out,
         title='Friday discovery <img src=x>'
         page.get_by_label('Headline',exact=True).fill(title)
         page.get_by_label('Message',exact=True).fill('Our store pick. A new story. Ask the team and discover something worth sharing.')
+        page.locator('[data-bb-options] summary').click()
         page.get_by_label('QR destination · optional',exact=True).fill('https://example.test/billboard-qa')
         page.get_by_label('TV group',exact=True).select_option('Bar TVs')
         info=owner.request.get(base+'/api/billboards',headers=headers).json()

@@ -68,7 +68,7 @@ function render(){
 }
 async function loadData(reset=false){if(S.venueId){S.data=await api('/venue');if(reset){S.draft=clone(S.data.venue.mix);S.theme=S.data.venue.theme;S.accent=S.data.venue.accent;S.selected=new Set(S.data.tvs.map(t=>t.id));}}}
 async function loadPage(){if(S.page==='revenue')S.revenue=await api('/revenue');if(S.page==='billing')S.billing=await api('/billing');if(S.page==='admin'){const [a,e]=await Promise.all([api('/admin'),api('/admin/environments')]);S.admin={...a,environments:e.environments};}if(S.page==='brands')S.brands=await api('/brands');}
-async function navigate(page){S.page=page;await loadPage();render();window.scrollTo({top:0,behavior:'instant'});}
+async function navigate(page){if(S.page==='commerce'&&disposeBillboards.canLeave?.()===false)return;S.page=page;await loadPage();render();window.scrollTo({top:0,behavior:'instant'});}
 async function start(){S.config=await api('/config');try{S.session=await api('/session');if(!S.session.venues.some(v=>v.id===S.venueId))S.venueId=S.session.venues[0]?.id||'';localStorage.setItem('mixx-venue',S.venueId);await loadData(true);if(!S.venueId)S.page=S.session.user.role==='brand'?'brands':'admin';await loadPage();}catch(e){if(e.status!==401)toast(e.message,true);S.session=null;}render();}
 function modal(title,content,formType,buttons='Save'){const d=$('#dialog');d.innerHTML=`<div class="dialog-head"><h2 id="dialog-title">${title}</h2><button data-action="close" aria-label="Close dialog">${icon('close')}</button></div>${formType?`<form data-form="${formType}">${content}<div class="form-error" role="alert"></div><div class="dialog-actions">${button('Cancel','close','secondary')}<button class="btn" type="submit">${buttons}</button></div></form>`:content}`;d.showModal();}
 function field(label,name,value='',type='text',extra=''){return `<label class="field"><span class="label">${label}</span><input name="${name}" type="${type}" value="${h(value)}" ${extra}></label>`;}
@@ -89,7 +89,7 @@ document.addEventListener('click',async e=>{
     if(a==='menu'){document.querySelector('.sidebar').classList.toggle('open');return;}
     if(a==='close'){$('#dialog').close();return;}
     if(a==='auth-switch'){S.auth=S.auth==='signup'?'login':'signup';render();return;}
-    if(a==='logout'){await api('/auth/logout',{});S.session=null;S.data=null;render();return;}
+    if(a==='logout'){if(S.page==='commerce'&&disposeBillboards.canLeave?.()===false)return;await api('/auth/logout',{});S.session=null;S.data=null;render();return;}
     if(a==='open-player'){window.open('/player/','_blank','noopener');return;}
     if(a==='world'){
       if(S.page==='home'){S.draft={...clone(defaultMix),worlds:{[el.dataset.id]:'normal'}};return await navigate('mixx');}
@@ -133,7 +133,7 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('input',e=>{if(e.target.matches('[data-player-volume]')){S.playerVolume=Number(e.target.value);const scope=e.target.closest('.player-audio-remote');if(scope)scope.querySelector('[data-volume-output]').textContent=e.target.value+'%';}});
 document.addEventListener('change',async e=>{try{
-  if(e.target.id==='venue-select'){disposeGameHost();disposeBillboards();S.venueId=e.target.value;localStorage.setItem('mixx-venue',S.venueId);await loadData(true);await loadPage();render();}
+  if(e.target.id==='venue-select'){if(S.page==='commerce'&&disposeBillboards.canLeave?.()===false){e.target.value=S.venueId;return;}disposeGameHost();disposeBillboards();S.venueId=e.target.value;localStorage.setItem('mixx-venue',S.venueId);await loadData(true);await loadPage();render();}
   if(e.target.id==='mix-length')S.draft.minutes=Number(e.target.value);
   if(e.target.id==='all-tvs'){S.selected=new Set(e.target.checked?S.data.tvs.map(t=>t.id):[]);render();}
   if(e.target.dataset.tvSelect){e.target.checked?S.selected.add(e.target.dataset.tvSelect):S.selected.delete(e.target.dataset.tvSelect);render();}
@@ -150,7 +150,7 @@ document.addEventListener('submit',async e=>{
     if(kind==='promotion')await api('/promotions',{kind:b.kind,title:b.title,description:b.description,startsAt:new Date(b.start).getTime(),endsAt:new Date(b.end).getTime()+86399000});
     if(kind==='contract'){const r=await api('/contracts',{years:Number(b.years),tvs:Number(b.tvs)});toast(r.message);}
     if(kind==='checkout'){const r=await api('/billing/checkout',{plan:b.plan,seats:Number(b.seats)});location.href=r.url;return;}
-    if(kind==='venue'){const r=await api('/venues',b);S.venueId=r.venueId;await start();}
+    if(kind==='venue'){if(S.page==='commerce'&&disposeBillboards.canLeave?.()===false)return;const r=await api('/venues',b);S.venueId=r.venueId;await start();}
     if(kind==='content')await api('/admin/media/'+b.id,{title:b.title,worlds:fd.getAll('world'),tags:b.tags.split(',').map(t=>t.trim()).filter(Boolean),status:b.status,resolution:Number(b.resolution),clean:fd.has('clean'),premiumOnly:fd.has('premiumOnly'),sponsor:fd.has('sponsor'),rightsConfirmed:fd.has('rightsConfirmed'),rightsUntil:b.rightsUntil?new Date(b.rightsUntil).getTime()+86399000:null},'PATCH');
     if(kind==='archive'){const file=fd.get('file');if(file.size>5*1024**3)throw Error('Use R2 multipart tools for files larger than 5 GB.');const p=await api('/admin/archive-upload',{filename:file.name,contentType:file.type||'text/vtt'});submit.textContent='Uploading…';const r=await fetch(p.url,{method:'PUT',headers:p.headers,body:file});if(!r.ok)throw Error(`R2 returned ${r.status}. Check bucket CORS and credentials.`);toast('Original archived: '+p.key);}
     if(kind==='campaign')await api('/admin/campaigns',{...b,startsAt:new Date(b.start).getTime(),endsAt:new Date(b.end).getTime()+86399000,active:fd.has('active')});
