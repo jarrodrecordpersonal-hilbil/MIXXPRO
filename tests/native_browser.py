@@ -16,6 +16,7 @@ from screen_browser_checks import screen_checks
 from environment_browser_checks import environment_checks
 from curator_browser_checks import curator_checks
 from game_browser_checks import game_checks
+from game_account_browser_checks import account_game_checks
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts'
@@ -282,6 +283,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     environment_checks(owner,page,player,player2,player_context,BASE,headers,OUT,passed,nav,wait)
 
                     game_checks(browser,owner,player,BASE,headers,database,OUT,passed,wait,errors,nav)
+                    account_game_checks(browser,owner,player,BASE,headers,database,OUT,passed,wait,errors,nav)
 
                     screen_checks(owner,page,player,BASE,headers,OUT,passed)
                     nav(page, 'home')
