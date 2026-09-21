@@ -280,7 +280,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     curator_checks(owner,player,BASE,headers,OUT,passed,nav,wait)
                     environment_checks(owner,page,player,player2,player_context,BASE,headers,OUT,passed,nav,wait)
 
-                    game_checks(browser,owner,player,BASE,headers,database,OUT,passed,wait,errors)
+                    game_checks(browser,owner,player,BASE,headers,database,OUT,passed,wait,errors,nav)
 
                     screen_checks(owner,page,player,BASE,headers,OUT,passed)
                     nav(page, 'home')
