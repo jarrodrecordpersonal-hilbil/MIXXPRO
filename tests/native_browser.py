@@ -13,6 +13,7 @@ import urllib.request
 import uuid
 from playwright.sync_api import sync_playwright, expect
 from screen_browser_checks import screen_checks
+from environment_browser_checks import environment_checks
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts'
@@ -273,6 +274,8 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     assert saved['metrics']['seconds'] > 0
                     assert saved['metrics']['dwell'] is None
                     passed('Reconnection drains the outbox into device-reported playback analytics, not human dwell')
+
+                    environment_checks(owner,page,player,player2,player_context,BASE,headers,OUT,passed,nav,wait)
 
                     # Bourbon Games: real venue TV + real home browser share one authoritative Proof Trials event.
                     response = owner.request.post(BASE + '/api/admin/games/proof-trials-demo', headers=headers, data={})
