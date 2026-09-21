@@ -7,6 +7,7 @@ import {publicRoutes} from './routes/public.mjs';
 import {adminRoutes} from './routes/admin.mjs';
 import {gameHostRoutes} from './routes/game-host.mjs';
 import {gameRoutes} from './routes/games.mjs';
+import {gameAccountRoutes} from './routes/game-accounts.mjs';
 import {createServer} from 'node:http';
 import {readFileSync,existsSync,statSync,createReadStream} from 'node:fs';
 import {fileURLToPath} from 'node:url';
@@ -25,7 +26,7 @@ const types=['golf','bourbon-bar','cigar','steakhouse','other'];
 const DEFAULT_MIX={mode:'single',worlds:{golf:'normal'},subcategories:{},minutes:180,seed:1};
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function configuration(env=process.env){
-  const c={...env,APP_ORIGIN:env.APP_ORIGIN||'http://localhost:3000',DB_PATH:env.DB_PATH||resolve(ROOT,'data/mixxpro.sqlite'),DEMO_MODE:env.DEMO_MODE==='true',PRODUCTION:env.NODE_ENV==='production',SIGNUPS_ENABLED:env.SIGNUPS_ENABLED==='true'||(env.NODE_ENV!=='production'&&env.SIGNUPS_ENABLED!=='false'),FREE_TV_LIMIT:Number(env.FREE_TV_LIMIT||5),COMMISSION_BPS:Number(env.COMMISSION_BPS||0)};
+  const c={...env,APP_ORIGIN:env.APP_ORIGIN||'http://localhost:3000',DB_PATH:env.DB_PATH||resolve(ROOT,'data/mixxpro.sqlite'),DEMO_MODE:env.DEMO_MODE==='true',GAME_ACCOUNTS_ENABLED:env.DEMO_MODE==='true'||env.GAME_ACCOUNTS_ENABLED==='true',PRODUCTION:env.NODE_ENV==='production',SIGNUPS_ENABLED:env.SIGNUPS_ENABLED==='true'||(env.NODE_ENV!=='production'&&env.SIGNUPS_ENABLED!=='false'),FREE_TV_LIMIT:Number(env.FREE_TV_LIMIT||5),COMMISSION_BPS:Number(env.COMMISSION_BPS||0)};
   if(c.PRODUCTION&&(!c.APP_SECRET||c.APP_SECRET.length<32||!c.APP_ORIGIN.startsWith('https://')||c.DEMO_MODE))throw Error('Production requires HTTPS APP_ORIGIN, APP_SECRET (32+ characters), and DEMO_MODE=false.');
   if(c.BUNNY_CDN_HOST&&!/^[a-z0-9.-]+$/i.test(c.BUNNY_CDN_HOST))throw Error('BUNNY_CDN_HOST must be a hostname without a scheme or path.');
   integer(c.FREE_TV_LIMIT,'Free TV allowance',1,100);integer(c.COMMISSION_BPS,'Commission rate',0,10000);
@@ -136,7 +137,7 @@ export function createApplication(options={}){
       }
       let raw='',b={};if(mutation){raw=await body(req);try{b=raw?JSON.parse(raw):{};}catch{fail(400,'Invalid JSON.');}if(!b||typeof b!=='object'||Array.isArray(b))fail(400,'Expected a JSON object.');}
       const context={req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg};
-      for(const route of [authRoutes,playerRoutes,venueRoutes,billingRoutes,gameHostRoutes,gameRoutes,publicRoutes,adminRoutes,screenActivityRoutes]){await route(context);if(res.writableEnded)return;}
+      for(const route of [authRoutes,playerRoutes,venueRoutes,billingRoutes,gameHostRoutes,gameAccountRoutes,gameRoutes,publicRoutes,adminRoutes,screenActivityRoutes]){await route(context);if(res.writableEnded)return;}
       if(path.startsWith('/api/'))fail(404,'API route not found.');
       if(method!=='GET'&&method!=='HEAD')fail(405,'Method not allowed.');
       if(path==='/demo/sample.mp4'){

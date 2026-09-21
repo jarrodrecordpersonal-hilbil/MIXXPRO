@@ -113,15 +113,90 @@ readable pick cards, and an explicit reconnect state. Phone mutations disable wh
 disconnected. The TV labels its last event update and hides the join QR until it
 reconnects. The guest page can show final standings even without a joined player.
 
-## Personal accounts and store teams: next layer
+## Persistent player accounts and store teams
 
-The requested model is a personal score plus a store/team score, counting each
-player once, with one store affiliation per player per event. This increment adds
-venue-aware QR entry and retains the existing personal event identity; it does
-not yet add permanent consumer accounts, immutable team membership, or team totals.
-Legacy self-reported location records must not be treated as verified team
-membership or summed as additional participants. A separate team-membership and
-account-linking increment is needed before advertising those capabilities.
+The next increment extends existing users, scrypt password hashes, sessions and
+CSRF protections. It does not introduce another authentication provider or grant
+venue membership. Consumer account registration creates only a user and a public
+player profile. Existing venue users may opt into a separate public player name.
+Accounts use the existing seven-day session lifetime; the account and saved game
+history survive session expiry and can be restored by signing in again.
+
+Account signup and account linking are explicit actions. A guest can save their
+current participant without changing its ID, predictions or score. Each account
+has at most one participant per event, and each participant has at most one account.
+A fresh signed-in device resolves that canonical participant without needing a
+guest cookie or creating another player. Two already-existing players are never
+combined, and different accounts cannot take over an existing account binding.
+
+After binding, guest cookies and old resume codes no longer authorize the saved
+participant. Sign-in is required on every device; signing out or session expiry
+removes private-pick access. Guest-only resume codes retain their previous behavior.
+Changing a password verifies the current password, revokes all account sessions,
+and issues a fresh session to the changing device. This also signs out any venue
+dashboard sessions belonging to that same user. The phone shows the most recent
+30 saved games with points computed from the same published-result projection.
+
+### Five-player store roster pilot
+
+The fictional demo provisions fixed five-player store teams with published
+`fixed-roster-sum-v1` rules. Other events require deliberate rule provisioning;
+migration 011 does not retroactively add teams to existing or in-progress events.
+Reopening the demo can add rules to an existing, still-unstarted lobby only.
+
+- A signed-in account saves/joins its event player, scans a presenting store's QR,
+  and explicitly joins that store's team. Visiting a QR is not team membership.
+- Venue identity is resolved from the active presentation on the server. Client
+  venue IDs, legacy location records, and extra devices cannot add team slots.
+- There is one store roster per event/venue, exactly five players to compete, and
+  one fixed store affiliation per account/event. No team switching or host roster
+  editing endpoint exists in this increment.
+- Membership is fixed when accepted. All rosters close permanently in the same
+  transaction that opens the first prediction window, including untimed windows.
+- Complete rosters compete on the sum of their five players' published points.
+  Incomplete rosters remain visible but unranked; their players still play and
+  score individually. Full rosters do not accept overflow players.
+- Team totals use `scoreRows`, never unpublished judge choices or an independent
+  score ledger. Publication and corrections immediately recompute personal and
+  team totals. Equal team totals share rank; name order breaks display order only.
+- Stopping a store's presentation does not remove its fixed roster or points.
+  Signing out, reloading, resuming on another device, or changing passwords does
+  not add membership or alter team totals.
+
+Phone, paired TV, host snapshot and publication responses share `teamRows`. SQLite
+transactions and unique account/event constraints protect roster admission and
+identity binding; focused HTTP tests include concurrent requests for the last slot
+and injected binding failure with rollback. Browser coverage creates five accounts,
+saves existing guest identities, joins the roster, signs in on another device,
+publishes and corrects scores, signs out, changes a password and restores TV playback.
+
+### Enablement, privacy and limits
+
+`GAME_ACCOUNTS_ENABLED=true` enables this restricted pilot outside demo mode.
+Demo mode enables it for synthetic testing. The default outside demo mode is off,
+and new registrations also require `SIGNUPS_ENABLED=true`. Enabling a production
+pilot and running its additive migration require deployment approval.
+
+Emails and password hashes stay in the existing user database. Only the signed-in
+account snapshot exposes its own email and CSRF value; TVs, public standings,
+other participants and host reporting receive public names and scores, not emails,
+credentials or account-to-player mappings. No marketing consent or commerce record
+is created. Existing game participation is not treated as a marketing subscription.
+
+Game profiles, account links, public display names, event picks, rosters and scores
+are persistent until an operator handles an authenticated removal request. The pilot
+has no automatic retention purge or self-service erasure; define and test the
+operator removal procedure before accepting real consumer data. Email verification
+and forgotten-password recovery are not implemented. The UI discloses the recovery
+limit; use synthetic credentials for this phase. Accounts are not verified humans,
+and multiple-account abuse remains possible. Do not advertise prize eligibility,
+proof of attendance or production anti-cheat guarantees from this foundation.
+
+Migration 011 is additive and tested against the actual pre-account schema with
+existing credentials and picks. Reopening is idempotent. Downgrading to pre-account
+server code is unsafe after bindings are created because old code does not enforce
+the new account-only access rule; rollback must preserve that authorization logic
+or restore an approved pre-pilot backup. No destructive downgrade is supplied.
 
 ## Proposed awards season
 
@@ -132,7 +207,7 @@ standings, building toward an awards finale. Audience prediction scores and the
 judges' actual tasting results remain separate; fan popularity does not determine
 a blind result. Blind sample identities need explicit concealment and reveal rules.
 
-This is a proposed extension, not implemented functionality. Draft format, season
+The draft and season layer is a proposed extension, not implemented functionality. Draft format, season
 scoring, eligibility, and roster locks still need definition. The current meaning
 of audience "betting" is free prediction points, with no cash stakes or prizes.
 

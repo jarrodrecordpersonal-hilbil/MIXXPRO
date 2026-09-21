@@ -1,14 +1,14 @@
 const h=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const code=decodeURIComponent(location.pathname.split('/').filter(Boolean)[1]||'').toUpperCase();
 const venueCode=new URL(location.href).searchParams.get('v')||'', $=id=>document.getElementById(id);
-let state=null,connected=false,busy=false,polling=false,generation=0,offset=0,renderKey='',uncertain=false;
+let state=null,connected=false,busy=false,polling=false,generation=0,offset=0,renderKey='',uncertain=false,accountUserId=null;
 const clock=()=>Date.now()+offset;
 const feedback=message=>{$('feedback').textContent=message;};
 async function api(path,body){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
   try{
-    const response=await fetch('/api/public/games/'+encodeURIComponent(code)+path+(venueCode?'?v='+encodeURIComponent(venueCode):''),{
-      method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),credentials:'same-origin',cache:'no-store',signal:controller.signal
+    const response=await fetch(path.startsWith('/api/')?path:'/api/public/games/'+encodeURIComponent(code)+path+(venueCode?'?v='+encodeURIComponent(venueCode):''),{
+      method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json',...(state?.account?.csrf?{'X-CSRF-Token':state.account.csrf}:{})},body:body===undefined?undefined:JSON.stringify(body),credentials:'same-origin',cache:'no-store',signal:controller.signal
     });
     const data=await response.json();
     if(!response.ok){const error=new Error(data.error||'Request failed.');error.status=response.status;throw error;}return data;
@@ -21,7 +21,7 @@ function open(matchupId){
 function controls(){
   document.body.dataset.connected=String(connected);
   document.querySelectorAll('[data-pick]').forEach(b=>b.disabled=busy||!open(b.dataset.matchup));
-  document.querySelectorAll('#join-form button,#resume-form button,#link-device').forEach(b=>b.disabled=busy||!connected);
+  document.querySelectorAll('#join-form button,#resume-form button,#link-device,#account-panel button,#account-mode,#team-join').forEach(b=>b.disabled=busy||!connected);
   $('retry').disabled=busy||polling;
 }
 function updateClock(){
@@ -38,10 +38,12 @@ function render(data){
   if(venueCode&&!data.venue){const home=document.createElement('a');home.href='/games/'+encodeURIComponent(code);home.textContent=' Join from home instead.';$('venue-context').append(home);}
   const final=data.event.status==='final',joined=!!data.participant;
   $('join').classList.toggle('hidden',joined||final);$('resume').classList.toggle('hidden',joined);$('play').classList.toggle('hidden',!joined&&!final);
-  $('device-tools').classList.toggle('hidden',!joined);
+  $('device-tools').classList.toggle('hidden',!joined||data.account?.linked);
   $('player-name').textContent=data.participant?.display_name||'Guest';
   $('my-score').textContent=(data.standings.find(row=>row.participantId===data.participant?.id)?.totalPoints||0)+' pts';
   $('player-strip').classList.toggle('hidden',!joined);
+  renderAccount(data);
+  renderTeams(data);
   const key=JSON.stringify([data.event,data.participant,data.predictions,data.standings]);
   if(key!==renderKey){
     renderKey=key;
@@ -58,6 +60,28 @@ function render(data){
     $('standings').innerHTML=data.standings.map((row,i)=>`<div ${row.participantId===data.participant?.id?'data-self':''}><span>${i+1}. ${h(row.name)}</span><b>${h(row.totalPoints)} pts</b></div>`).join('')||'<p class="muted">The field is open. Your name could be first.</p>';
   }
   updateClock();
+}
+function renderAccount(data){
+ const a=data.account||{};
+ if(accountUserId!==a.userId){$('account-games').textContent='';$('link-code').textContent='';accountUserId=a.userId;}
+ $('account-panel').classList.toggle('hidden',!a.enabled);
+ $('account-entry').classList.toggle('hidden',!!a.signedIn);$('account-signed').classList.toggle('hidden',!a.signedIn);
+ $('account-summary').textContent=a.linked?'Your player account':'Keep your game';
+ $('account-status').textContent=a.signedIn?`${a.email} · ${a.linked?'This player and its picks are saved to your account.':a.profile?'Save this player to keep its picks, or join the event with your account.':'Choose a public player name to start.'}`:'';
+ $('profile-form').classList.toggle('hidden',!a.signedIn||!!a.profile);
+ $('account-save').classList.toggle('hidden',!a.profile||!data.participant||a.linked);
+ if(a.profile&&!data.participant&&document.activeElement!==$('guest-name'))$('guest-name').value=a.profile.displayName;
+}
+function renderTeams(data){
+ const rules=data.event.teamRules;
+ $('team-panel').classList.toggle('hidden',!rules||!data.account?.enabled);
+ if(!rules)return;
+ $('team-rule').textContent=rules.description;
+ $('my-team').textContent=data.myTeam?`Your store: ${data.myTeam.name} · ${data.teams.find(t=>t.venueId===data.myTeam.venueId)?.points||0} pts. ${rules.locked?'Roster locked.':'Your place is saved.'}`:rules.locked?'Rosters are locked. Your individual picks still count.':!data.account?.linked?'Save your player to an account, then join through your store’s game QR.':data.venue?`${rules.size} players for ${data.venue.name}. Your store is fixed when you join; rosters close when predictions open.`:'Scan a participating store’s game QR to join its team.';
+ const local=data.teams.find(t=>t.venueId===data.venue?.id),canJoin=data.account?.linked&&data.venue&&!data.myTeam&&!rules.locked&&(!local||local.memberCount<rules.size);
+ $('team-join').classList.toggle('hidden',!canJoin);$('team-join').textContent=data.venue?'Join '+data.venue.name+' team':'Join this store team';
+ if(!data.myTeam&&!rules.locked&&local?.memberCount>=rules.size)$('my-team').textContent='This store team is full. Your individual picks still count.';
+ $('team-standings').innerHTML=data.teams.map(t=>`<div ${t.venueId===data.myTeam?.venueId?'data-self':''}><span>${t.rank===null?'':t.rank+'. '}${h(t.name)}<small>${t.memberCount}/${t.capacity} players · ${t.status==='incomplete'?'Incomplete roster · unranked':t.status==='competing'?'Roster locked':t.status==='ready'?'Ready to compete':'Forming'}</small></span><b>${t.points} pts</b></div>`).join('')||'<p class="muted">Store rosters are open. Be first to represent yours.</p>';
 }
 function disconnected(error){
   connected=false;
@@ -88,6 +112,14 @@ $('matchups').addEventListener('click',event=>{
 $('join-form').onsubmit=event=>{event.preventDefault();const f=new FormData(event.target);void mutate('/join',{name:f.get('name'),locationKind:venueCode?'venue':'home',...(venueCode?{venueCode}:{})},'You’re in. Your picks stay with this player on this browser.');};
 $('resume-form').onsubmit=event=>{event.preventDefault();void mutate('/resume',{code:new FormData(event.target).get('code')},'Your player and saved picks are restored.');};
 $('link-device').onclick=async()=>{const result=await mutate('/link-device',{},'Resume code created.');if(result)$('link-code').textContent=result.code+' · one use · valid for 10 minutes';};
+$('account-mode').onchange=()=>{const create=$('account-mode').value==='register';$('account-name-field').classList.toggle('hidden',!create);$('account-name').required=create;$('account-password').minLength=create?12:1;$('account-password').autocomplete=create?'new-password':'current-password';$('account-submit').textContent=create?'Create account':'Sign in';if(create&&!$('account-name').value)$('account-name').value=state?.participant?.display_name||'';};
+$('account-form').onsubmit=async event=>{event.preventDefault();const create=$('account-mode').value==='register';try{await mutate('/api/public/game-account/'+(create?'register':'login'),Object.fromEntries(new FormData(event.target)),create?'Account created. Save this player to keep its picks.':'Signed in. Your saved player is restored when you already joined this event.');}finally{$('account-password').value='';}};
+$('profile-form').onsubmit=event=>{event.preventDefault();void mutate('/api/public/game-account/profile',Object.fromEntries(new FormData(event.target)),'Player profile created. Save this player to keep its picks.');};
+$('account-save').onclick=()=>void mutate('/save-account',{},'Player saved. Sign in on any device to restore these picks.');
+$('account-logout').onclick=()=>void mutate('/api/auth/logout',{},'Signed out. Your account and saved picks are protected.');
+$('account-history').onclick=async()=>{const result=await mutate('/api/public/game-account',undefined,'Your saved games are ready.');if(result)$('account-games').innerHTML=result.history.map(e=>`<p><a href="/games/${encodeURIComponent(e.code)}">${h(e.name)}</a> · ${e.points} pts · ${h(e.status)}</p>`).join('')||'<p>No saved games yet.</p>';};
+$('password-form').onsubmit=async event=>{event.preventDefault();try{await mutate('/api/public/game-account/password',Object.fromEntries(new FormData(event.target)),'Password updated. Your other devices are signed out.');}finally{$('current-password').value='';$('new-password').value='';}};
+$('team-join').onclick=()=>void mutate('/team',{venueCode},'Your store team place is saved for this event.');
 $('retry').onclick=()=>void refresh();
 window.addEventListener('offline',()=>disconnected());window.addEventListener('online',()=>void refresh());
 void refresh();setInterval(refresh,2000);setInterval(updateClock,250);

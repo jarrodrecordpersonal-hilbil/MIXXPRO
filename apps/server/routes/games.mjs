@@ -1,12 +1,11 @@
-import {scoreRows} from '../game-standings.mjs';
-const participantCookie=req=>((req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('mixx_game='))||'').slice(10);
-const participantFor=(db,eventId,raw,hash)=>raw?db.get('SELECT p.id,p.display_name FROM game_participant_credentials c JOIN game_participants p ON p.id=c.participant_id WHERE c.event_id=? AND c.credential_hash=? AND c.revoked_at IS NULL AND p.event_id=?',eventId,hash(raw),eventId):null;
+import {scoreRows,teamRows,teamRules} from '../game-standings.mjs';
+import {participantCookie,participantFor,accountParticipant,accountWrite,bindAccount,gameAccountView} from '../game-identity.mjs';
 export function eventView(db,event){
  const entries=db.all('SELECT id,seed,name,story FROM tasting_entries WHERE event_id=? ORDER BY seed',event.id);
  const matchups=db.all('SELECT id,round,slot,entry_a_id AS entryAId,entry_b_id AS entryBId FROM tasting_matchups WHERE event_id=? ORDER BY round,slot',event.id);
  const judges=db.all('SELECT id,name FROM tasting_judges WHERE event_id=? ORDER BY name',event.id);
  const outcomes=db.all('SELECT o.matchup_id AS matchupId,o.winner_entry_id AS winnerEntryId,o.revision,o.published_at AS publishedAt,o.corrected_at AS correctedAt FROM tasting_outcomes o JOIN tasting_matchups m ON m.id=o.matchup_id WHERE m.event_id=?',event.id);
- return {id:event.id,code:event.code,name:event.name,status:event.status,phase:event.phase||'lobby',phaseDeadline:event.phase_deadline||null,activeMatchupId:event.active_matchup_id||null,stateRevision:event.state_revision||0,scoringVersion:event.scoring_version,entries,matchups,judges,outcomes};
+ return {id:event.id,code:event.code,name:event.name,status:event.status,phase:event.phase||'lobby',phaseDeadline:event.phase_deadline||null,activeMatchupId:event.active_matchup_id||null,stateRevision:event.state_revision||0,scoringVersion:event.scoring_version,teamRules:teamRules(db,event.id),entries,matchups,judges,outcomes};
 }
 export async function gameRoutes(context){
  const {req,res,path,method,url,b,db,config,json,audit,transaction,access,admin,id,now,token,hash,fail,text,qrSvg}=context;
@@ -19,9 +18,10 @@ export async function gameRoutes(context){
  }
  if(method==='POST'&&path==='/api/admin/games/proof-trials-demo'){
   const user=admin(req);if(!config.DEMO_MODE)fail(403,'Proof Trials fixtures are available only in demo mode.');
-  const existing=db.get("SELECT id,code FROM tasting_events WHERE code='PROOF26'");if(existing)return json(res,200,{ok:true,...existing});
+  const existing=db.get("SELECT id,code FROM tasting_events WHERE code='PROOF26'");if(existing){db.run("INSERT OR IGNORE INTO game_team_rules(event_id,team_size) SELECT id,5 FROM tasting_events WHERE id=? AND phase='lobby' AND status IN ('open','live')",existing.id);return json(res,200,{ok:true,...existing});}
   const eventId=id(),created=now(),names=['Oak & Ember','River Proof','Warehouse Nine','Copper Trail'];
   transaction(()=>{db.run("INSERT INTO tasting_events(id,code,name,status,created_at,updated_at) VALUES(?,?,?,?,?,?)",eventId,'PROOF26','Proof Trials · Fictional Demo','open',created,created);
+   db.run('INSERT INTO game_team_rules(event_id,team_size) VALUES(?,5)',eventId);
    const entryIds=names.map((name,i)=>{const x=id();db.run('INSERT INTO tasting_entries(id,event_id,seed,name,story) VALUES(?,?,?,?,?)',x,eventId,i+1,name,'Fictional tasting entry for product testing.');return x;});
    db.run('INSERT INTO tasting_matchups(id,event_id,round,slot,entry_a_id,entry_b_id) VALUES(?,?,?,?,?,?)',id(),eventId,1,1,entryIds[0],entryIds[1]);
    db.run('INSERT INTO tasting_matchups(id,event_id,round,slot,entry_a_id,entry_b_id) VALUES(?,?,?,?,?,?)',id(),eventId,1,2,entryIds[2],entryIds[3]);
@@ -32,12 +32,14 @@ export async function gameRoutes(context){
  }
  if(method==='POST'&&path.startsWith('/api/public/games/')&&path.endsWith('/link-device')){
   const code=path.split('/')[4],event=db.get("SELECT * FROM tasting_events WHERE code=? AND status!='draft'",code);if(!event)fail(404,'Event not found.');
-  const raw=participantCookie(req);if(!raw)fail(401,'Join the event first.');const participant=participantFor(db,event.id,raw,hash);if(!participant)fail(401,'Join the event first.');
+  const raw=participantCookie(req);const participant=participantFor(context,event.id);if(!participant)fail(401,'Join the event first.');
+  if(accountParticipant(context,event.id))fail(409,'Sign in to your account on the other device to restore this player.');
   const link=token(9).toUpperCase(),expires=now()+10*60000;transaction(()=>{db.run('DELETE FROM game_identity_links WHERE participant_id=? AND used_at IS NULL',participant.id);db.run('INSERT INTO game_identity_links(code_hash,participant_id,expires_at) VALUES(?,?,?)',hash(link),participant.id,expires);});return json(res,201,{code:link,expiresAt:expires});
  }
  if(method==='POST'&&path.startsWith('/api/public/games/')&&path.endsWith('/resume')){
   const code=path.split('/')[4],event=db.get("SELECT * FROM tasting_events WHERE code=? AND status!='draft'",code);if(!event)fail(404,'Event not found.');
   const link=text(b.code,'Resume code',20).toUpperCase(),row=db.get('SELECT l.*,p.event_id,p.display_name FROM game_identity_links l JOIN game_participants p ON p.id=l.participant_id WHERE l.code_hash=? AND l.expires_at>? AND l.used_at IS NULL',hash(link),now());if(!row||row.event_id!==event.id)fail(400,'Resume code is invalid or expired.');
+  if(db.get('SELECT 1 FROM game_account_participants WHERE participant_id=?',row.participant_id))fail(403,'Sign in to the saved account to restore this player.');
   let raw=participantCookie(req),credentialHash=raw?hash(raw):null;
   if(!raw){raw=token(32);credentialHash=hash(raw);}
   transaction(()=>{
@@ -56,7 +58,7 @@ export async function gameRoutes(context){
   const phase=['lobby','predictions','judging','results','complete'].includes(b.phase)?b.phase:null;if(!phase)fail(400,'Choose a valid event phase.');if(!Number.isInteger(b.expectedRevision)||b.expectedRevision!==event.state_revision)fail(409,'Event state changed. Refresh before controlling it.');
   let matchupId=null,matchup=null;if(b.matchupId){matchup=db.get('SELECT * FROM tasting_matchups WHERE id=? AND event_id=?',text(b.matchupId,'Matchup',80),eventId);if(!matchup)fail(404,'Matchup not found.');matchupId=matchup.id;}
   const allowed={open:['lobby','predictions'],lobby:['predictions','complete'],predictions:['judging','complete'],judging:['results','complete'],results:['predictions','complete'],complete:[]},current=event.status==='final'?'complete':event.phase||'lobby';if(!allowed[current]?.includes(phase))fail(409,'That event phase transition is not allowed.');if(phase==='predictions'&&!matchupId)fail(400,'Choose the active matchup for predictions.');if(phase==='predictions'&&(matchup.predictions_locked_at||db.get('SELECT 1 FROM tasting_outcomes WHERE matchup_id=?',matchupId)))fail(409,'That matchup is permanently locked for predictions.');if(['judging','results'].includes(phase)&&event.active_matchup_id&&matchupId!==event.active_matchup_id)fail(409,'Continue with the active matchup.');
-  const seconds=b.seconds===undefined?null:Math.max(5,Math.min(3600,Number(b.seconds)||0)),deadline=seconds===null?null:now()+seconds*1000,status=phase==='complete'?'final':'live',stamp=now();transaction(()=>{if(current==='predictions'&&event.active_matchup_id)db.run('UPDATE tasting_matchups SET predictions_locked_at=COALESCE(predictions_locked_at,?) WHERE id=?',stamp,event.active_matchup_id);const result=db.run('UPDATE tasting_events SET phase=?,phase_deadline=?,active_matchup_id=?,status=?,state_revision=state_revision+1,updated_at=? WHERE id=? AND state_revision=?',phase,deadline,matchupId,status,stamp,eventId,b.expectedRevision);if(result.changes!==1)fail(409,'Event state changed. Refresh before controlling it.');});audit(user.id,venue.id,'game.phase.changed',{eventId,phase,matchupId,deadline,revision:event.state_revision+1});return json(res,200,{ok:true,event:eventView(db,db.get('SELECT * FROM tasting_events WHERE id=?',eventId))});
+  const seconds=b.seconds===undefined?null:Math.max(5,Math.min(3600,Number(b.seconds)||0)),deadline=seconds===null?null:now()+seconds*1000,status=phase==='complete'?'final':'live',stamp=now();transaction(()=>{if(['predictions','complete'].includes(phase))db.run('UPDATE game_team_rules SET locked_at=COALESCE(locked_at,?) WHERE event_id=?',stamp,eventId);if(current==='predictions'&&event.active_matchup_id)db.run('UPDATE tasting_matchups SET predictions_locked_at=COALESCE(predictions_locked_at,?) WHERE id=?',stamp,event.active_matchup_id);const result=db.run('UPDATE tasting_events SET phase=?,phase_deadline=?,active_matchup_id=?,status=?,state_revision=state_revision+1,updated_at=? WHERE id=? AND state_revision=?',phase,deadline,matchupId,status,stamp,eventId,b.expectedRevision);if(result.changes!==1)fail(409,'Event state changed. Refresh before controlling it.');});audit(user.id,venue.id,'game.phase.changed',{eventId,phase,matchupId,deadline,revision:event.state_revision+1});return json(res,200,{ok:true,event:eventView(db,db.get('SELECT * FROM tasting_events WHERE id=?',eventId))});
  }
  if(method==='POST'&&path.startsWith('/api/games/')&&path.endsWith('/judge-submit')){
   const {venue,user}=access(req,true),eventId=path.split('/')[3];
@@ -66,26 +68,30 @@ export async function gameRoutes(context){
  }
  if(method==='GET'&&path.startsWith('/api/public/games/')){
   const code=path.split('/')[4],event=db.get("SELECT * FROM tasting_events WHERE code=? AND status!='draft'",code);if(!event)fail(404,'Event not found.');
-  const raw=participantCookie(req),participant=participantFor(db,event.id,raw,hash);
+  const raw=participantCookie(req),participant=participantFor(context,event.id);
   const predictions=participant?db.all('SELECT p.matchup_id AS matchupId,p.prediction_kind AS kind,p.judge_id AS judgeId,p.entry_id AS entryId,p.submitted_at AS submittedAt FROM game_predictions p JOIN tasting_matchups m ON m.id=p.matchup_id WHERE p.participant_id=? AND m.event_id=? ORDER BY p.matchup_id,p.prediction_kind,p.judge_id',participant.id,event.id):[];
   const venueCode=url.searchParams.get('v'),venue=venueCode?db.get('SELECT v.id,v.name FROM venues v JOIN event_presentations p ON p.venue_id=v.id WHERE v.qr_code=? AND p.event_id=? AND p.active=1 LIMIT 1',venueCode,event.id):null;
-  return json(res,200,{event:eventView(db,event),participant,predictions,venue,serverTime:now(),standings:scoreRows(db,event.id),scoring:{bracket:'1 point for each published matchup winner predicted correctly.',judge:'1 point for each named judge choice predicted correctly, after the matchup result is published.'}});
+  const standings=scoreRows(db,event.id),user=context.readSession(req),myTeam=user?db.get('SELECT m.venue_id AS venueId,v.name FROM game_team_memberships m JOIN venues v ON v.id=m.venue_id WHERE m.user_id=? AND m.event_id=?',user.id,event.id):null;
+  return json(res,200,{event:eventView(db,event),participant,predictions,venue,serverTime:now(),standings,teams:teamRows(db,event.id,standings),myTeam:myTeam||null,account:gameAccountView(context,event.id),scoring:{bracket:'1 point for each published matchup winner predicted correctly.',judge:'1 point for each named judge choice predicted correctly, after the matchup result is published.'}});
  }
  if(method==='POST'&&path.startsWith('/api/public/games/')&&path.endsWith('/join')){
   const code=path.split('/')[4],event=db.get("SELECT * FROM tasting_events WHERE code=? AND status IN ('open','live')",code);if(!event)fail(404,'This event is not open.');
   const linkedVenue=b.venueCode?db.get('SELECT v.id,v.name FROM venues v JOIN event_presentations p ON p.venue_id=v.id WHERE v.qr_code=? AND p.event_id=? AND p.active=1 LIMIT 1',text(b.venueCode,'Venue code',40),event.id):null;
   if(b.venueCode&&!linkedVenue)fail(409,'This venue is no longer presenting the event. Open the guest page without the venue link to join from home.');
-  const displayName=text(b.name,'Display name',40),kind=linkedVenue||b.locationKind==='venue'?'venue':'home',roomKey=linkedVenue?'event-qr':kind==='venue'?text(b.roomKey||'','Room',40,true):'home';
+  const signed=context.readSession(req),profile=signed?db.get('SELECT display_name FROM game_profiles WHERE user_id=?',signed.id):null;
+  const displayName=profile?.display_name||text(b.name,'Display name',40),kind=linkedVenue||b.locationKind==='venue'?'venue':'home',roomKey=linkedVenue?'event-qr':kind==='venue'?text(b.roomKey||'','Room',40,true):'home';
   let raw=participantCookie(req);if(!raw){raw=token(32);res.setHeader('Set-Cookie',`mixx_game=${raw}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${config.PRODUCTION?'; Secure':''}`);}
-  const identity=hash(raw),created=now();let participant=participantFor(db,event.id,raw,hash);
+  const identity=hash(raw),created=now();let participant=participantFor(context,event.id);
   if(db.get('SELECT 1 FROM game_participant_credentials WHERE event_id=? AND credential_hash=? AND revoked_at IS NOT NULL',event.id,identity))fail(401,'This device no longer has access to this event.');
-  if(!participant){const participantId=id();transaction(()=>{db.run('INSERT INTO game_participants(id,event_id,identity_hash,display_name,created_at,last_seen) VALUES(?,?,?,?,?,?)',participantId,event.id,identity,displayName,created,created);db.run('INSERT INTO game_participant_credentials(event_id,credential_hash,participant_id,created_at) VALUES(?,?,?,?)',event.id,identity,participantId,created);});participant=db.get('SELECT * FROM game_participants WHERE id=?',participantId);}else db.run('UPDATE game_participants SET display_name=?,last_seen=? WHERE id=?',displayName,created,participant.id);
+  if(profile){if(!config.GAME_ACCOUNTS_ENABLED)fail(403,'Player accounts are not enabled for this pilot.');accountWrite(context);participant=transaction(()=>bindAccount(context,event,signed));}
+  else if(!participant){if(db.get('SELECT 1 FROM game_participant_credentials c JOIN game_account_participants a ON a.participant_id=c.participant_id WHERE c.event_id=? AND c.credential_hash=?',event.id,identity))fail(401,'Sign in to restore the account saved on this browser.');const participantId=id();transaction(()=>{db.run('INSERT INTO game_participants(id,event_id,identity_hash,display_name,created_at,last_seen) VALUES(?,?,?,?,?,?)',participantId,event.id,identity,displayName,created,created);db.run('INSERT INTO game_participant_credentials(event_id,credential_hash,participant_id,created_at) VALUES(?,?,?,?)',event.id,identity,participantId,created);});participant=db.get('SELECT * FROM game_participants WHERE id=?',participantId);}else db.run('UPDATE game_participants SET display_name=?,last_seen=? WHERE id=?',displayName,created,participant.id);
   const venueId=linkedVenue?.id||(kind==='venue'&&typeof b.venueId==='string'?b.venueId:null);db.run('INSERT INTO game_participation(participant_id,location_kind,venue_id,room_key,last_seen) VALUES(?,?,?,?,?) ON CONFLICT(participant_id,location_kind,room_key) DO UPDATE SET last_seen=excluded.last_seen',participant.id,kind,venueId,roomKey,created);
   return json(res,200,{participant:{id:participant.id,name:displayName},event:eventView(db,event)});
  }
  if(method==='POST'&&path.startsWith('/api/public/games/')&&path.endsWith('/predict')){
   const code=path.split('/')[4],event=db.get("SELECT * FROM tasting_events WHERE code=? AND status='live'",code);if(!event||event.phase!=='predictions'||!event.active_matchup_id||(event.phase_deadline&&event.phase_deadline<=now()))fail(409,'Predictions are closed.');
-  const raw=participantCookie(req);if(!raw)fail(401,'Join the event first.');const participant=participantFor(db,event.id,raw,hash);if(!participant)fail(401,'Join the event first.');
+  const raw=participantCookie(req);const participant=participantFor(context,event.id);if(!participant)fail(401,'Join the event first.');
+  if(accountParticipant(context,event.id))accountWrite(context);
   const matchup=db.get('SELECT * FROM tasting_matchups WHERE id=? AND event_id=?',text(b.matchupId,'Matchup',80),event.id);if(!matchup)fail(404,'Matchup not found.');if(matchup.id!==event.active_matchup_id)fail(409,'That matchup is not open for predictions.');if(matchup.predictions_locked_at||db.get('SELECT 1 FROM tasting_outcomes WHERE matchup_id=?',matchup.id))fail(409,'Predictions are permanently locked for that matchup.');
   const entryId=text(b.entryId,'Entry',80);if(![matchup.entry_a_id,matchup.entry_b_id].includes(entryId))fail(400,'Choose an entry in this matchup.');
   const kind=b.kind==='judge'?'judge':'bracket';let judgeId='';if(kind==='judge'){judgeId=text(b.judgeId,'Judge',80);if(!db.get('SELECT id FROM tasting_judges WHERE id=? AND event_id=?',judgeId,event.id))fail(404,'Judge not found.');}
@@ -101,6 +107,6 @@ export async function gameRoutes(context){
   const prior=db.get('SELECT * FROM tasting_outcomes WHERE matchup_id=?',matchup.id),event=db.get('SELECT * FROM tasting_events WHERE id=?',eventId),stamp=now();
   if(!Number.isInteger(b.expectedRevision)||b.expectedRevision!==(prior?.revision||0))fail(409,'Result changed. Refresh and review the winner before publishing.');
   if(!prior&&(event.status!=='live'||!['judging','results'].includes(event.phase)||event.active_matchup_id!==matchup.id))fail(409,'Publish only the active matchup after predictions close.');
-  db.run('INSERT INTO tasting_outcomes(matchup_id,winner_entry_id,revision,published_at,corrected_at) VALUES(?,?,?,?,?) ON CONFLICT(matchup_id) DO UPDATE SET winner_entry_id=excluded.winner_entry_id,revision=tasting_outcomes.revision+1,corrected_at=excluded.published_at',matchup.id,winner,prior?prior.revision+1:1,stamp,prior?stamp:null);audit(user.id,null,'game.outcome.published',{eventId,matchupId:matchup.id,corrected:!!prior});return json(res,200,{ok:true,standings:scoreRows(db,eventId)});
+  db.run('INSERT INTO tasting_outcomes(matchup_id,winner_entry_id,revision,published_at,corrected_at) VALUES(?,?,?,?,?) ON CONFLICT(matchup_id) DO UPDATE SET winner_entry_id=excluded.winner_entry_id,revision=tasting_outcomes.revision+1,corrected_at=excluded.published_at',matchup.id,winner,prior?prior.revision+1:1,stamp,prior?stamp:null);audit(user.id,null,'game.outcome.published',{eventId,matchupId:matchup.id,corrected:!!prior});return json(res,200,{ok:true,standings:scoreRows(db,eventId),teams:teamRows(db,eventId)});
  }
 }

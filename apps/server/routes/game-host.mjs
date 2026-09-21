@@ -1,5 +1,5 @@
 import {eventView} from './games.mjs';
-import {scoreRows} from '../game-standings.mjs';
+import {scoreRows,teamRows} from '../game-standings.mjs';
 
 export async function gameHostRoutes({req,res,path,method,b,db,json,access,text,fail,audit,now}){
   if(method==='GET'&&path==='/api/games'){
@@ -25,7 +25,7 @@ export async function gameHostRoutes({req,res,path,method,b,db,json,access,text,
     event:eventView(db,event),
     lockedMatchupIds:db.all('SELECT id FROM tasting_matchups WHERE event_id=? AND predictions_locked_at IS NOT NULL',event.id).map(m=>m.id),
     capabilities:{canControl:!!db.get('SELECT 1 FROM tasting_event_operators WHERE event_id=? AND user_id=?',event.id,user.id),canPublish},
-    assignedJudges,submissions,standings:scoreRows(db,event.id),
+    assignedJudges,submissions,standings:scoreRows(db,event.id),teams:teamRows(db,event.id),
     tvGroups:db.all('SELECT group_name AS name,COUNT(*) AS count FROM tvs WHERE venue_id=? AND revoked=0 GROUP BY group_name ORDER BY group_name',venue.id),
     presentations:db.all('SELECT group_name AS groupName FROM event_presentations WHERE event_id=? AND venue_id=? AND active=1 ORDER BY group_name',event.id,venue.id)
   });
