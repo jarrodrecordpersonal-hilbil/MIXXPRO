@@ -3,12 +3,14 @@ import json
 from playwright.sync_api import expect
 
 
-def curator_checks(owner, player, base, headers, out, passed, wait):
+def curator_checks(owner, player, base, headers, out, passed, nav, wait):
     page = owner.new_page()
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     try:
-        page.goto(base + '/admin')
+        page.goto(base)
+        page.locator('[data-page="admin"]').first.wait_for(state='attached')
+        nav(page, 'admin')
         panel = page.locator('[data-curator-environments]')
         expect(panel).to_be_visible()
         panel.get_by_role('button', name='Create environment', exact=True).click()
