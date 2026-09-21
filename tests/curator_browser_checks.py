@@ -73,5 +73,10 @@ def curator_checks(owner, player, base, headers, out, passed, nav, wait):
         assert not any(e['id'] == environment_id for e in owner.request.get(base + '/api/environments', headers=headers).json()['environments'])
         assert not errors, errors
         passed('Curator withdrawal restores the TV fallback; the admin workflow has no uncaught browser errors')
+    except Exception:
+        page.screenshot(path=str(out / 'native-curator-failure.png'), full_page=True)
+        print('Curator page errors:', errors, flush=True)
+        print('Curator dialog count:', page.locator('.curator-dialog').count(), flush=True)
+        raise
     finally:
         page.close()
