@@ -5,6 +5,7 @@ import json,os,sqlite3,subprocess,tempfile,time,urllib.request,uuid
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 from settings_browser_checks import settings_checks
+from finish_browser_checks import finish_checks
 ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'artifacts';OUT.mkdir(exist_ok=True)
 BASE='http://127.0.0.1:3362';checks=[];errors=[]
 def passed(label):checks.append(label);print('PASS:',label,flush=True)
@@ -31,6 +32,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-activation-') as temp:
                     settings=page.locator('nav [data-stream-settings]');expect(settings.locator('summary')).to_be_visible()
                     if not settings.evaluate('(el)=>el.open'):settings.locator('summary').click()
                     settings_checks(page,context,BASE,database,OUT,passed)
+                    finish_checks(page,context,BASE,database,OUT,passed)
                     expect(page.locator('nav [data-extension="music"]')).to_be_visible();page.locator('nav [data-extension="music"]').click();expect(page.get_by_role('heading',name='Plan your room’s music.')).to_be_visible();passed('Music setup is reachable from the existing venue dashboard')
                     page.locator('[name="payer"][value="sponsor"]').check();page.locator('[name="confirm"]').check();page.locator('#music-request button[type=submit]').click();expect(page.get_by_text('Awaiting review',exact=True)).to_be_visible();expect(page.locator('#music-request')).to_have_count(0);passed('Sponsor request persists without self-activation or payment')
                     page.on('dialog',lambda d:d.accept());page.locator('[data-cancel]').click();expect(page.locator('#music-request')).to_be_visible();page.locator('[name="payer"][value="venue"]').check();page.locator('[name="zones"]').fill('2');page.locator('[name="confirm"]').check();page.locator('#music-request button[type=submit]').click();expect(page.get_by_text('Venue-paid music',exact=True)).to_be_visible();passed('Owner can cancel a request and choose venue-funded music instead')

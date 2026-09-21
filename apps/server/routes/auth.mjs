@@ -1,7 +1,8 @@
 /** Auth API routes. Authorization remains inside every scoped operation. */
 export async function authRoutes(context){
-  const {req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg}=context;
+  const {req,res,path,method,url,ip,b,raw,db,config,uiVersion,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg}=context;
       const googleReady=!!(process.env.GOOGLE_CLIENT_ID&&process.env.GOOGLE_CLIENT_SECRET);
+      if(method==='GET'&&path==='/api/ui-version')return json(res,200,{version:uiVersion});
       if(method==='GET'&&path==='/api/health')return json(res,200,{ok:true,version:'0.2.0'});
       if(method==='GET'&&path==='/api/config')return json(res,200,{worlds:WORLDS,themes:THEMES,demo:config.DEMO_MODE,signups:config.SIGNUPS_ENABLED,googleReady,mediaReady:!!(config.BUNNY_CDN_HOST&&config.BUNNY_TOKEN_KEY),commerceReady:!!config.COMMERCE_URL,commissionConfigured:config.COMMISSION_BPS>0});
       if(method==='GET'&&path==='/api/auth/google'){
