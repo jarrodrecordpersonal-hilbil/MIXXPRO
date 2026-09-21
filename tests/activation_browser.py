@@ -6,6 +6,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 from settings_browser_checks import settings_checks
 from finish_browser_checks import finish_checks
+from pilot_browser_checks import pilot_checks
 ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'artifacts';OUT.mkdir(exist_ok=True)
 BASE='http://127.0.0.1:3362';checks=[];errors=[]
 def passed(label):checks.append(label);print('PASS:',label,flush=True)
@@ -31,6 +32,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-activation-') as temp:
                     page.goto(BASE);page.locator('input[name="name"]').fill('Jordan');page.locator('input[name="venueName"]').fill('Oak & Ember');page.locator('input[name="email"]').fill('activation-'+uuid.uuid4().hex[:8]+'@example.test');page.locator('input[name="password"]').fill('test-activation-password-2026');page.locator('[data-form="auth"] button[type=submit]').click()
                     settings=page.locator('nav [data-stream-settings]');expect(settings.locator('summary')).to_be_visible()
                     if not settings.evaluate('(el)=>el.open'):settings.locator('summary').click()
+                    pilot_checks(page,context,BASE,database,OUT,passed)
                     settings_checks(page,context,BASE,database,OUT,passed)
                     finish_checks(page,context,BASE,database,OUT,passed)
                     expect(page.locator('nav [data-extension="music"]')).to_be_visible();page.locator('nav [data-extension="music"]').click();expect(page.get_by_role('heading',name='Plan your room’s music.')).to_be_visible();passed('Music setup is reachable from the existing venue dashboard')
