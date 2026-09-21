@@ -9,43 +9,43 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
     host.on('pageerror', lambda error: errors.append(str(error)))
     host.on('dialog', lambda dialog: dialog.accept())
     second_host = None
-    host.goto(base)
-    host.locator('[data-page="games"]').first.wait_for(state='attached')
-    nav(host, 'games')
-    expect(host.locator('[data-host-status]')).to_have_text('Up to date.')
-    host.get_by_role('button', name='Open fictional demo', exact=True).click()
-    expect(host.locator('[data-host-phase]')).to_have_text('Lobby')
-    event = owner.request.get(base + '/api/public/games/PROOF26').json()['event']
-    event_id = event['id']
-    matchup, judge = event['matchups'][0], event['judges'][0]
-    entry_name = '<i data-entry-injected>Oak</i>'
-    guest_name = '<b data-guest-injected>Riley</b>'
-    # Disposable fixture only. No API for editing live event entries is assumed.
-    with sqlite3.connect(database) as connection:
-        connection.execute('UPDATE tasting_entries SET name=? WHERE id=?', (entry_name, matchup['entryAId']))
-    host.get_by_role('button', name='Refresh', exact=True).click()
-    expect(host.get_by_label('Next matchup')).to_contain_text(entry_name)
-    before = player.evaluate("async()=>{const {get}=await import('/player/offline.mjs');return (await get('kv','manifest')).value;}")
-    audio = player.locator('#video').evaluate('(v)=>({volume:v.volume,muted:v.muted})')
-
-    def present():
-        host.get_by_label('TV group', exact=True).select_option('Bar TVs')
-        host.get_by_role('button', name='Show event on TVs', exact=True).click()
-        expect(host.locator('[data-host-status]')).to_contain_text('Presentation requested')
-
-    def phase(name):
-        labels = {'predictions': 'Open predictions', 'judging': 'Close predictions & start judging',
-                  'results': 'Close judging & show results', 'complete': 'End event'}
-        if name == 'predictions':
-            host.get_by_label('Next matchup', exact=True).select_option(matchup['id'])
-            host.get_by_label('Prediction window', exact=True).select_option('120')
-        with host.expect_response(lambda r: r.url.endswith('/phase') and r.request.method == 'POST') as accepted:
-            host.get_by_role('button', name=labels[name], exact=True).click()
-        assert accepted.value.status == 200, accepted.value.text()
-        expect(host.locator('[data-host-phase]')).to_have_text({'predictions': 'Predictions open', 'judging': 'Judging', 'results': 'Results', 'complete': 'Complete'}[name])
-
-    present()
     try:
+        host.goto(base)
+        host.locator('[data-page="games"]').first.wait_for(state='attached')
+        nav(host, 'games')
+        expect(host.locator('[data-host-status]')).to_have_text('Up to date.')
+        host.get_by_role('button', name='Open fictional demo', exact=True).click()
+        expect(host.locator('[data-host-phase]')).to_have_text('Lobby')
+        event = owner.request.get(base + '/api/public/games/PROOF26').json()['event']
+        event_id = event['id']
+        matchup, judge = event['matchups'][0], event['judges'][0]
+        entry_name = '<i data-entry-injected>Oak</i>'
+        guest_name = '<b data-guest-injected>Riley</b>'
+        # Disposable fixture only. No API for editing live event entries is assumed.
+        with sqlite3.connect(database) as connection:
+            connection.execute('UPDATE tasting_entries SET name=? WHERE id=?', (entry_name, matchup['entryAId']))
+        host.get_by_role('button', name='Refresh', exact=True).click()
+        expect(host.get_by_label('Next matchup')).to_contain_text(entry_name)
+        before = player.evaluate("async()=>{const {get}=await import('/player/offline.mjs');return (await get('kv','manifest')).value;}")
+        audio = player.locator('#video').evaluate('(v)=>({volume:v.volume,muted:v.muted})')
+
+        def present():
+            host.get_by_label('TV group', exact=True).select_option('Bar TVs')
+            host.get_by_role('button', name='Show event on TVs', exact=True).click()
+            expect(host.locator('[data-host-status]')).to_contain_text('Presentation requested')
+
+        def phase(name):
+            labels = {'predictions': 'Open predictions', 'judging': 'Close predictions & start judging',
+                      'results': 'Close judging & show results', 'complete': 'End event'}
+            if name == 'predictions':
+                host.get_by_label('Next matchup', exact=True).select_option(matchup['id'])
+                host.get_by_label('Prediction window', exact=True).select_option('120')
+            with host.expect_response(lambda r: r.url.endswith('/phase') and r.request.method == 'POST') as accepted:
+                host.get_by_role('button', name=labels[name], exact=True).click()
+            assert accepted.value.status == 200, accepted.value.text()
+            expect(host.locator('[data-host-phase]')).to_have_text({'predictions': 'Predictions open', 'judging': 'Judging', 'results': 'Results', 'complete': 'Complete'}[name])
+
+        present()
         wait(player, "!document.getElementById('game-stage').classList.contains('hidden')", timeout=12000)
         expect(player.locator('#game-join')).to_contain_text('PROOF26')
         expect(player.locator('#game-matchups')).to_contain_text(entry_name)
