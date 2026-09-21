@@ -276,7 +276,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     assert saved['metrics']['dwell'] is None
                     passed('Reconnection drains the outbox into device-reported playback analytics, not human dwell')
 
-                    curator_checks(owner,player,BASE,headers,OUT,passed,wait)
+                    curator_checks(owner,player,BASE,headers,OUT,passed,nav,wait)
                     environment_checks(owner,page,player,player2,player_context,BASE,headers,OUT,passed,nav,wait)
 
                     # Bourbon Games: real venue TV + real home browser share one authoritative Proof Trials event.
