@@ -106,7 +106,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     for primary in ['home','mixx','tvs','revenue']:
                         expect(page.locator(f'[data-page="{primary}"]').first).to_be_visible()
                     assert page.locator('[data-stream-settings]').count() == 1
-                    assert page.locator('[data-page="billing"]').count() == 0
+                    assert page.locator('[data-page="billing"],[data-page="themes"],[data-go="themes"]').count() == 0
                     passed('Streamlined venue shell exposes Home, MIXX, TV, Results with secondary Settings')
                     session = owner.request.get(BASE + '/api/session').json()
                     venue_id = session['venues'][0]['id']
@@ -118,6 +118,11 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     response = owner.request.post(BASE + '/api/admin/demo-content', headers=headers, data={})
                     assert response.status == 201, response.text()
 
+                    # Preserve an existing venue look while the UI only edits programming.
+                    response = owner.request.patch(BASE + '/api/venue', headers=headers, data={'theme':'speakeasy'})
+                    assert response.status == 200, response.text()
+                    page.reload()
+                    expect(page.get_by_role('heading', name='Home.')).to_be_visible()
                     nav(page, 'mixx')
                     page.locator('[data-mode="blend"]').click()
                     page.locator('[data-action="world"][data-id="bourbon"]').click()
@@ -127,14 +132,8 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                         page.locator('[data-action="save-mix"]').click()
                     saved = owner.request.get(BASE + '/api/venue', headers=headers).json()
                     assert saved['venue']['mix']['worlds'] == {'golf': 'more', 'bourbon': 'normal', 'travel': 'normal'}
-                    page.locator('[data-stream-settings] summary').click()
-                    nav(page, 'themes')
-                    page.locator('[data-action="theme"][data-id="speakeasy"]').click()
-                    with page.expect_response(lambda r: r.url.endswith('/api/venue') and r.request.method == 'PATCH'):
-                        page.locator('[data-action="save-theme"]').click()
-                    saved = owner.request.get(BASE + '/api/venue', headers=headers).json()
                     assert saved['venue']['theme'] == 'speakeasy'
-                    passed('Weighted My Mix and independent theme persist through real browser requests')
+                    passed('Saving a weighted MIXX preserves the existing venue theme without an appearance setup step')
 
                     player_context = p.chromium.launch_persistent_context(str(profile), **BROWSER, headless=True,
                         viewport={'width': 1440, 'height': 900}, args=['--no-sandbox','--autoplay-policy=user-gesture-required'])
@@ -293,14 +292,14 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     nav(page, 'home')
                     page.screenshot(path=str(OUT / 'native-home-desktop.png'), full_page=True)
                     page.set_viewport_size({'width': 390, 'height': 844})
-                    for view in ['home', 'mixx', 'themes', 'tvs', 'schedule', 'commerce', 'revenue']:
+                    for view in ['home', 'mixx', 'tvs', 'schedule', 'commerce', 'revenue']:
                         nav(page, view)
                         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), view + ' overflows'
                         if view == 'mixx':
                             page.screenshot(path=str(OUT / 'native-mixx-mobile.png'), full_page=True)
                         if view == 'tvs':
                             page.screenshot(path=str(OUT / 'native-remote-audio-mobile.png'), full_page=True)
-                    passed('Seven real venue pages have no horizontal overflow at 390px')
+                    passed('Six real venue pages have no horizontal overflow at 390px')
 
                     player_context.set_offline(True)
                     # Exercise the existing lease-expiry guard using a disposable fixture lease.

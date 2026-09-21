@@ -20,7 +20,7 @@ def settings_checks(page, context, base, database, out, passed):
     expect(settings.locator('[data-settings-group="venue"]')).to_have_text('Venue tools')
     expect(settings.locator('[data-settings-group="reports"]')).to_have_text('Reporting')
     expect(settings.locator('[data-settings-group="network"]')).to_have_count(0)
-    expect(page.locator('[data-page="billing"]')).to_have_count(0)
+    expect(page.locator('[data-page="billing"],[data-page="themes"],[data-go="themes"]')).to_have_count(0)
     expect(page.locator('[data-page="admin"],[data-extension="setup"]')).to_have_count(0)
     expect(page.locator('[data-extension="music"]')).to_contain_text('Music setup')
     nav('games')
@@ -62,29 +62,70 @@ def settings_checks(page, context, base, database, out, passed):
     expect(page.locator('nav [data-page="tvs"]')).to_have_attribute('aria-current', 'page')
     passed('Game discovery reports connection failures, recovers explicitly and links to real TV controls')
 
-    nav('themes')
-    expect(page.locator('[data-action="apply-theme"]')).to_be_disabled()
-    page.locator('[data-action="theme"][data-id="speakeasy"]').click()
-    page.locator('[data-action="save-theme"]').click()
-    expect(page.locator('#toast')).to_contain_text('Venue look saved')
     nav('schedule')
+    page.screenshot(path=str(out/'schedule-empty-desktop.png'), full_page=True)
     page.locator('[data-action="schedule"]').first.click()
-    expect(page.locator('#dialog')).to_contain_text('Applies to all TVs')
-    page.locator('#dialog [name="name"]').fill('Dinner QA')
-    page.locator('#dialog button[type="submit"]').click()
-    expect(page.locator('.main')).to_contain_text('Dinner QA')
+    form=page.locator('[data-schedule-editor]')
+    expect(form).to_contain_text('All TVs')
+    for input in form.locator('[name="world"]').all():
+        if input.is_checked():input.locator('..').click()
+    form.locator('[name="world"][value="bourbon"]').locator('..').click()
+    form.locator('[data-schedule-days="weekdays"]').click()
+    form.locator('[name="name"]').fill('Dinner QA')
+    expect(form.locator('[data-schedule-summary]')).to_have_text('Bourbon')
+    expect(form.locator('[data-schedule-time]')).to_contain_text('Weekdays · 6 PM – 9 PM · All TVs')
+    page.screenshot(path=str(out/'schedule-editor-desktop.png'), full_page=True)
+    form.locator('button[type="submit"]').click()
+    expect(page.locator('.schedule-card')).to_contain_text('Dinner QA')
+    with sqlite3.connect(database) as db:
+        original=db.execute('SELECT id,theme,tv_ids,created_at FROM schedules').fetchone()
+        assert db.execute('SELECT COUNT(*) FROM schedules').fetchone()[0] == 1
+    page.locator('[data-action="schedule"][data-id]').click()
+    expect(form.locator('[name="name"]')).to_have_value('Dinner QA')
+    expect(form.locator('[name="world"][value="bourbon"]')).to_be_checked()
+    for input in form.locator('[name="day"]').all():
+        if input.is_checked() != (input.input_value()=='5'):input.locator('..').click()
+    form.locator('[name="world"][value="golf"]').locator('..').click()
+    form.locator('[name="start"]').fill('22:00')
+    form.locator('[name="end"]').fill('02:00')
+    form.locator('[name="name"]').fill('Friday late')
+    expect(form.locator('[data-schedule-time]')).to_contain_text('Fri · 10 PM – 2 AM · ends next day')
+    page.set_viewport_size({'width':390,'height':844})
+    assert page.locator('#dialog').evaluate('(el)=>el.scrollWidth<=el.clientWidth')
+    assert form.locator('button[type="submit"]').evaluate('(el)=>{const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight}')
+    page.screenshot(path=str(out/'schedule-editor-mobile.png'), full_page=True)
+    page.route('**/api/schedules/*',lambda route: route.fulfill(status=503,content_type='application/json',body='{"error":"Connection temporarily unavailable."}') if route.request.method=='PATCH' else route.continue_())
+    form.locator('button[type="submit"]').click()
+    expect(form.locator('.form-error')).to_contain_text('Connection temporarily unavailable')
+    expect(form.locator('[name="name"]')).to_have_value('Friday late')
+    with sqlite3.connect(database) as db:
+        assert db.execute('SELECT name FROM schedules WHERE id=?',(original[0],)).fetchone()[0] == 'Dinner QA'
+    page.unroute('**/api/schedules/*')
+    form.locator('button[type="submit"]').click()
+    expect(page.locator('.schedule-card')).to_contain_text('Friday late')
+    with sqlite3.connect(database) as db:
+        assert db.execute('SELECT id,theme,tv_ids,created_at FROM schedules').fetchone() == original
+        assert db.execute('SELECT COUNT(*) FROM schedules').fetchone()[0] == 1
+    page.reload()
+    expect(page.get_by_role('heading',name='Home.',exact=True)).to_be_visible()
+    nav('schedule')
+    expect(page.locator('.schedule-card')).to_contain_text('Friday late')
+    expect(page.locator('.schedule-card')).to_contain_text('ends next day')
+    page.screenshot(path=str(out/'schedule-saved-mobile.png'), full_page=True)
+    page.set_viewport_size({'width':1440,'height':1050})
+    passed('Scheduling supports inline programming, day presets, overnight summaries, editing, failed-save recovery and reload without duplicate rows')
     nav('commerce')
     expect(page.locator('[data-bb-status]')).to_contain_text('Drafts are up to date')
     expect(page.locator('[data-bb-publish]')).to_be_disabled()
-    passed('Appearance saves a default before pairing, schedules save real rows, and new billboards require a saved draft')
+    passed('New billboards require a saved draft before publication')
 
     page.set_viewport_size({'width':390,'height':844})
-    for name in ['themes','schedule','commerce','games']:
+    for name in ['schedule','commerce','games']:
         nav(name)
         expect(page.locator('h1')).to_be_visible()
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), name
     page.screenshot(path=str(out/'settings-games-mobile.png'), full_page=True)
-    passed('All four venue Settings screens fit a 390px phone without horizontal overflow')
+    passed('All three venue Settings screens fit a 390px phone without horizontal overflow')
 
     session = context.request.get(base+'/api/session').json()
     with sqlite3.connect(database) as db:
@@ -92,10 +133,9 @@ def settings_checks(page, context, base, database, out, passed):
     page.reload()
     expect(page.get_by_role('heading', name='Home.', exact=True)).to_be_visible()
     expect(page.locator('nav [data-page="games"]')).to_have_count(0)
-    nav('themes')
-    expect(page.get_by_text('View only.', exact=False)).to_be_visible()
-    expect(page.locator('[data-action="save-theme"]')).to_be_disabled()
+    expect(page.locator('[data-page="themes"]')).to_have_count(0)
     nav('schedule')
+    expect(page.get_by_text('View only.', exact=False)).to_be_visible()
     expect(page.locator('[data-action="schedule"]').first).to_be_disabled()
     expect(page.locator('[data-action="remove-schedule"]')).to_be_disabled()
     with sqlite3.connect(database) as db:
@@ -106,4 +146,4 @@ def settings_checks(page, context, base, database, out, passed):
     settings=page.locator('nav [data-stream-settings]')
     if not settings.evaluate('(el)=>el.open'):
         settings.locator('summary').click()
-    passed('Viewers can inspect appearance and schedules without being offered unauthorized edits')
+    passed('Viewers can inspect schedules without being offered unauthorized edits')
