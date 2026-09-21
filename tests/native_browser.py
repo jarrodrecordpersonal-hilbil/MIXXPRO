@@ -22,6 +22,7 @@ OUT = ROOT / 'artifacts'
 OUT.mkdir(exist_ok=True)
 BASE = 'http://127.0.0.1:3361'
 checks, errors = [], []
+BROWSER = {'executable_path': os.environ['CHROMIUM']} if os.environ.get('CHROMIUM') else {}
 
 def passed(label):
     checks.append(label)
@@ -84,7 +85,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
             else:
                 raise RuntimeError('Isolated test server did not start')
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True, args=['--no-sandbox'])
+                browser = p.chromium.launch(**BROWSER, headless=True, args=['--no-sandbox'])
                 owner = browser.new_context(viewport={'width': 1440, 'height': 1120})
                 page = owner.new_page()
                 page.on('pageerror', lambda error: errors.append(str(error)))
@@ -132,7 +133,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     assert saved['venue']['theme'] == 'speakeasy'
                     passed('Weighted My Mix and independent theme persist through real browser requests')
 
-                    player_context = p.chromium.launch_persistent_context(str(profile), headless=True,
+                    player_context = p.chromium.launch_persistent_context(str(profile), **BROWSER, headless=True,
                         viewport={'width': 1440, 'height': 900}, args=['--no-sandbox','--autoplay-policy=user-gesture-required'])
                     player = player_context.pages[0]
                     player.on('pageerror', lambda error: errors.append(str(error)))
@@ -158,7 +159,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
 
                     # Pair a second real player so remote targeting can prove isolation and group/all behavior.
                     profile2 = directory / 'player-profile-2'
-                    player2_context = p.chromium.launch_persistent_context(str(profile2), headless=True,
+                    player2_context = p.chromium.launch_persistent_context(str(profile2), **BROWSER, headless=True,
                         viewport={'width': 1280, 'height': 800}, args=['--no-sandbox','--autoplay-policy=user-gesture-required'])
                     player2 = player2_context.pages[0]
                     player2.on('pageerror', lambda error: errors.append(str(error)))
@@ -257,7 +258,7 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     assert queued > 0
                     passed('Downloaded media continues offline and telemetry persists in real IndexedDB')
                     player_context.close()
-                    player_context = p.chromium.launch_persistent_context(str(profile), headless=True,
+                    player_context = p.chromium.launch_persistent_context(str(profile), **BROWSER, headless=True,
                         viewport={'width': 1440, 'height': 900}, offline=True, args=['--no-sandbox'])
                     player = player_context.pages[0]
                     player.on('pageerror', lambda error: errors.append(str(error)))
