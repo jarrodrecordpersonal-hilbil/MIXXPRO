@@ -19,6 +19,9 @@ def passed(message):
     checks.append(message)
     print('PASS:', message, flush=True)
 
+def accept_dialog(dialog):
+    dialog.accept()
+
 def fits(page):
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
 
@@ -53,7 +56,7 @@ with (OUT / 'server.log').open('w') as log:
                 contexts.append(context)
                 page = context.new_page()
                 page.on('pageerror', lambda error: errors.append(str(error)))
-                page.on('dialog', lambda dialog: dialog.accept())
+                page.on('dialog', accept_dialog)
                 return page
             try:
                 phone = newpage(390)
@@ -98,12 +101,12 @@ with (OUT / 'server.log').open('w') as log:
                 phone.screenshot(path=str(OUT / '02-recipe-phone.png'), full_page=True)
                 # Reject a navigation that would discard edits and prove the input survives.
                 phone.locator('[data-component=A]').fill('30')
-                phone.remove_all_listeners('dialog')
+                phone.remove_listener('dialog', accept_dialog)
                 phone.once('dialog', lambda dialog: dialog.dismiss())
                 phone.locator('[data-view=results]').click()
                 expect(phone.locator('[data-component=A]')).to_have_value('30')
                 expect(phone.locator('body')).to_have_attribute('data-view', 'enter')
-                phone.on('dialog', lambda dialog: dialog.accept())
+                phone.on('dialog', accept_dialog)
                 passed('Explicit percent steppers, correct trial measurements, total feedback, saved draft persistence and unsaved-navigation protection')
 
                 host = newpage()
