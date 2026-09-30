@@ -1,5 +1,5 @@
 /* Layout-only refinement. Keep the concurrent original-brand/media implementation. */
-body[data-view=play] main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:0 28px;grid-template-areas:"title title" "tabs tabs" "notice notice" "watch play" "season season"}
+body[data-view=play] main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:0 28px;grid-template-areas:"title title" "tabs tabs" "practice practice" "notice notice" "watch play" "season season"}
 body[data-view=play] .hero,body[data-view=play] .how{display:none}
 body[data-view=play] .workspace-head{grid-area:title}
 body[data-view=play] .tabs{grid-area:tabs}
@@ -11,4 +11,9 @@ body[data-view=play] .watch-layout{grid-template-columns:1fr;gap:16px}
 body[data-view=play] .season-details{grid-area:season;margin-top:26px}
 body[data-view=play] #play-event{width:100%;min-height:56px;justify-content:space-between;font-size:17px}
 body[data-view=play] .join-now{border-top-color:#f15e39}
-@media(max-width:800px){body[data-view=play] main{grid-template-columns:1fr;grid-template-areas:"title" "tabs" "notice" "play" "watch" "season"}body[data-view=play] #mixxtank-watch{margin-top:24px}body[data-view=play] #workspace>.grid{gap:18px}}
+@media(max-width:800px){body[data-view=play] main{grid-template-columns:1fr;grid-template-areas:"title" "tabs" "practice" "notice" "play" "watch" "season"}body[data-view=play] #mixxtank-watch{margin-top:24px}body[data-view=play] #workspace>.grid{gap:18px}}
+
+.rehearsal-launch{display:none}
+body[data-view=play] .rehearsal-launch{grid-area:practice;display:flex;gap:20px;justify-content:space-between;align-items:center;border:1px solid #c4b6aa;border-left:5px solid #f15e39;border-radius:4px;background:#fffefa;padding:19px 22px;margin:0 0 22px}
+.rehearsal-launch strong{font-size:21px;letter-spacing:-.02em}.rehearsal-launch p{font-size:14px;color:#62564e;margin:6px 0 0}.rehearsal-launch .primary{min-height:52px;white-space:nowrap}
+@media(max-width:600px){body[data-view=play] .rehearsal-launch{padding:17px;display:block}.rehearsal-launch .primary{width:100%;margin-top:15px}.rehearsal-launch strong{font-size:20px}}
