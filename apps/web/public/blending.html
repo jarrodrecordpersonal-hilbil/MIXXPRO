@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#10120f"><meta name="description" content="Create your blend. Predict the judges. Join Bourbon Games from home, even while the show is playing.">
+  <title>The Blending Games · Bourbon Games</title>
+  <link rel="icon" href="/icon.svg"><link rel="stylesheet" href="/blending.css">
+</head>
+<body>
+  <a class="skip" href="#workspace">Skip to the game</a>
+  <div id="test-ribbon" class="test-ribbon" hidden>PRIVATE PILOT PREVIEW · FICTIONAL WHISKEY, TEAMS & JUDGES · NOT A LIVE COMPETITION</div>
+  <div class="shell">
+    <header class="topbar">
+      <a href="/blending" class="brand"><img src="/bourbon-games-logo.svg" alt="Bourbon Games"></a>
+      <nav aria-label="Main"><a href="/play">All games</a><button type="button" id="account-button">Sign in</button></nav>
+    </header>
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy"><p class="eyebrow"><span class="pulse" aria-hidden="true"></span> AT HOME. IN THE GAME.</p>
+          <h1 id="hero-title">Your blend.<br><em>Their verdict.</em></h1>
+          <p class="lede">Make a blend worth talking about. Let the judges decide.<br class="desktop"> Or call the winner from your couch.</p>
+          <div class="hero-actions"><button class="button primary" id="join-main">JOIN & PLAY <span aria-hidden="true">↗</span></button><button class="button outline" id="enter-main">ENTER A BLEND <span aria-hidden="true">+</span></button></div>
+          <p class="micro">Free prediction play. No purchase required. <strong>Join anytime—even during the show.</strong></p>
+        </div>
+        <aside class="live-card" aria-label="Current game"><div id="live-card-content"><p class="eyebrow">BOURBON GAMES</p><h2>Getting the<br>flight ready.</h2><p>Loading the next way to play…</p></div></aside>
+      </section>
+      <section id="season-strip" class="season-strip" aria-label="Season milestones"></section>
+      <div class="workspace-head"><div><p class="eyebrow">THE BLENDING GAMES</p><h2 id="season-name">One competition. Two ways in.</h2></div><span class="join-tag">ENTRY STAYS OPEN</span></div>
+      <nav class="tabs" aria-label="Game workspace"><button data-view="play" aria-current="page">Play live</button><button data-view="enter">Enter a blend</button><button data-view="results">Results</button><button data-view="judge">Judge desk</button><button data-view="host" id="host-tab" hidden>Producer desk</button></nav>
+      <div id="notice" role="status" aria-live="polite" tabindex="-1" hidden></div>
+      <section id="workspace" tabindex="-1"><p class="muted">Loading the competition…</p></section>
+      <section class="how"><article><span>01 / CREATE</span><h3>Make it yours.</h3><p>Your team. The specified whiskey components. One original blend.</p></article><article><span>02 / CALL IT</span><h3>Read the judges.</h3><p>Predict the winner and individual judges’ choices before each reveal.</p></article><article><span>03 / STAY IN</span><h3>Never too late to join.</h3><p>Missed a round? Play the next. New blends enter the next eligible judging batch.</p></article></section>
+    </main>
+    <footer><span>BOURBON GAMES <i>/</i> THE BLENDING GAMES</span><span>Programming by MIXX TANK · Powered by MIXXWAVE</span></footer>
+  </div>
+  <script type="module" src="/blending.mjs"></script>
+</body>
+</html>

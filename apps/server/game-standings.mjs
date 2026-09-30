@@ -1,7 +1,7 @@
 /** One authoritative score projection for phones, TVs and result publication. */
-export function scoreRows(db,eventId){
+export function scoreRows(db,eventId,matchupId=null){
   const participants=db.all('SELECT id,display_name FROM game_participants WHERE event_id=?',eventId);
-  const outcomes=new Map(db.all('SELECT o.matchup_id matchupId,o.winner_entry_id winnerEntryId FROM tasting_outcomes o JOIN tasting_matchups m ON m.id=o.matchup_id WHERE m.event_id=?',eventId).map(row=>[row.matchupId,row.winnerEntryId]));
+  const outcomes=new Map(db.all('SELECT o.matchup_id matchupId,o.winner_entry_id winnerEntryId FROM tasting_outcomes o JOIN tasting_matchups m ON m.id=o.matchup_id WHERE m.event_id=?',eventId).filter(row=>!matchupId||row.matchupId===matchupId).map(row=>[row.matchupId,row.winnerEntryId]));
   return participants.map(participant=>{
     const predictions=db.all('SELECT matchup_id matchupId,prediction_kind kind,judge_id judgeId,entry_id entryId FROM game_predictions WHERE participant_id=?',participant.id);
     let bracketPoints=0,judgePoints=0;

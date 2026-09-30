@@ -59,6 +59,8 @@ jobs:
         run: python tests/native_browser.py
       - name: Venue music funding and Bunny setup browser acceptance
         run: python tests/activation_browser.py
+      - name: At-home blending and join-anytime browser acceptance
+        run: python tests/blending_browser.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
