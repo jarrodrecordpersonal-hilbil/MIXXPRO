@@ -5,7 +5,7 @@ const formData = form => Object.fromEntries(new FormData(form));
 const date = stamp => stamp ? new Intl.DateTimeFormat(undefined, {month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', timeZoneName:'short'}).format(stamp) : 'Dates to be announced';
 const localDate = stamp => {const d = new Date(stamp); return new Date(stamp - d.getTimezoneOffset() * 60000).toISOString().slice(0,16);};
 const stageKeys = ['round1', 'round2', 'last-chance', 'final'];
-const state = {code: location.pathname.split('/')[2] || '', view: new URL(location.href).searchParams.get('view') || 'play', data: null, index: null, host: null, judge: null, busy: false, online: true, authMode: 'login'};
+const state = {preview: null, previewChecked: false, previewJudge: '1', code: location.pathname.split('/')[2] || '', view: new URL(location.href).searchParams.get('view') || 'play', data: null, index: null, host: null, judge: null, busy: false, online: true, authMode: 'login'};
 const account = () => state.data?.account || state.index?.account || {};
 function notice(message, error = false) {
   const node = $('#notice'); node.hidden = !message; node.textContent = message;
@@ -13,7 +13,7 @@ function notice(message, error = false) {
 }
 async function api(path, body) {
   const response = await fetch(path, {method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin',
-    headers: {'Content-Type':'application/json', ...(account().csrf ? {'X-CSRF-Token': account().csrf} : {})},
+    headers: {'Content-Type':'application/json', ...(state.preview ? {'X-Preview-Judge':state.previewJudge} : {}), ...(account().csrf ? {'X-CSRF-Token': account().csrf} : {})},
     body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15000)});
   const result = await response.json();
   if (!response.ok) { const error = new Error(result.error || 'This action could not be completed.'); error.status = response.status; throw error; }
@@ -51,7 +51,12 @@ function changeView(view) {
   else render();
   $('#workspace').scrollIntoView({behavior:'smooth', block:'start'});
 }
+function previewTools() {
+  if (!state.preview) return '';
+  return `<article class="panel preview-tools"><p class="eyebrow">OPEN BUILD PREVIEW · NO SIGN-IN</p><h2>Try every side of the game.</h2><p>These are shared fictional teams, whiskeys and scores. Anyone with the link can operate the demo. Do not enter real personal details or recipes. Changes reset on restart or when someone resets the demo.</p><div class="hero-actions">${button('Try judge desk','data-go="judge"')}${button('Try producer desk','data-go="host"')}${button('Reset shared demo','data-preview-reset')}</div></article>`;
+}
 function authPanel() {
+  if (state.preview) return previewTools();
   if (account().signedIn) {
     if (!account().profile && state.view === 'enter') return `<article class="panel auth-panel"><p class="eyebrow">YOUR PLAYER PROFILE</p><h2>What should we call you?</h2><p>This is your public player name, not your email.</p><form id="profile-form"><label class="field"><span>Public player name</span><input name="name" required maxlength="40" autocomplete="nickname"></label>${button('Save player name', 'type="submit"', true)}</form></article>`;
     return `<article class="panel auth-panel"><p class="eyebrow">YOUR ACCOUNT</p><h2>${esc(account().profile?.displayName || 'Signed in')}</h2><p>${esc(account().email)}</p>${button('Sign out', 'id="logout"')}</article>`;
@@ -87,10 +92,10 @@ function recipePanel() {
   const target = d.intake;
   const values = new Map((draft?.recipe || []).map(row => [row.code, row.bps / 100]));
   const canCreate = !queued;
-  return `<div class="grid"><article class="panel"><div class="row"><p class="eyebrow">${draft ? 'YOUR SAVED DRAFT' : 'MAKE YOUR ENTRY'}</p><span class="badge">PRIVATE RECIPE</span></div><h2>${queued ? 'Your blend is in the intake queue.' : draft ? 'Keep working on your blend.' : 'Start with a good name.'}</h2>
+  return `<div class="grid"><article class="panel"><div class="row"><p class="eyebrow">${draft ? 'YOUR SAVED DRAFT' : 'MAKE YOUR ENTRY'}</p><span class="badge">${state.preview ? 'SHARED TEST RECIPE' : 'PRIVATE RECIPE'}</span></div><h2>${queued ? 'Your blend is in the intake queue.' : draft ? 'Keep working on your blend.' : 'Start with a good name.'}</h2>
     ${queued ? `<p>Your recipe is saved and locked. It is not entered in the already-locked championship. The next intake date has not been promised.</p><p><strong>${esc(queued.blendName)}</strong></p>${target.batchId ? button('Review & enter the new judging batch', 'id="place-queued"', true) : ''}` : `<form id="recipe-form" data-id="${esc(draft?.id || '')}" data-revision="${draft?.revision || 0}" data-target="${esc(target.key)}">
       <div class="form-grid"><label class="field"><span>Team name</span><input name="teamName" value="${esc(d.team?.name || '')}" ${d.team ? 'readonly' : ''} maxlength="60" required placeholder="Your club, crew or just you"></label><label class="field"><span>Blend name</span><input name="blendName" value="${esc(draft?.blendName || '')}" maxlength="70" required placeholder="Give it a name"></label></div>
-      <p class="fine">Use these exact component batches. Percentages are by volume and must total 100% when you submit.</p>
+      <p class="fine">${state.preview ? 'TEST RECIPE ONLY. Anyone using this preview can see or change the shared example entry. ' : ''}Use these exact component batches. Percentages are by volume and must total 100% when you submit.</p>
       ${components.map(component => `<div class="component"><span class="code">${esc(component.code)}</span><label for="pct-${esc(component.code)}">${esc(component.name)}<small>Share of your finished blend</small></label><input id="pct-${esc(component.code)}" data-component="${esc(component.code)}" type="number" inputmode="decimal" step="0.01" min="0" max="100" value="${values.get(component.code) ?? 0}" required aria-label="${esc(component.name)} percentage"></div>`).join('')}
       <div class="total-line"><span>RECIPE TOTAL</span><output id="recipe-total">0.00%</output></div>
       ${!draft ? '<label class="check"><input name="age21" type="checkbox" required><span>All competing team members are 21 or older.</span></label>' : ''}
@@ -98,7 +103,7 @@ function recipePanel() {
       <div class="hero-actions">${button(draft ? 'Save draft' : 'Create & save draft', 'type="submit" data-submit="draft"', true)}${draft ? button('Submit & lock recipe', 'type="submit" data-submit="final"') : ''}</div>
       <p class="fine">Saving a draft does not reserve a judging place. Submitted recipes cannot be edited. No bottle purchase changes the judging score.</p></form>`}
   </article><div><article class="panel"><p class="eyebrow">CONFIRM YOUR DESTINATION</p><h2 id="intake-name">${esc(target.name)}</h2><p>${esc(target.explanation)}</p><p><strong>Submit by</strong><br>${esc(date(target.closesAt))}</p><p class="fine">The server checks this again when you submit. A full or closed batch moves your opportunity forward only after you review the new destination.</p></article>
-  <article class="panel"><p class="eyebrow">YOUR ENTRIES</p>${d.myEntries.length ? d.myEntries.map(entry => `<div class="saved-entry"><div class="row"><strong>${esc(entry.blendName)}</strong><span class="badge ${entry.status === 'submitted' ? 'good' : ''}">${esc(entry.status)}</span></div><p>${esc(entry.batchName || 'Next competition intake')}</p>${entry.submittedAt ? `<p>Locked ${esc(date(entry.submittedAt))}</p>` : ''}</div>`).join('') : '<p>Your first saved draft will appear here. Sign in on another device to pick up where you left off.</p>'}</article></div></div>`;
+  <article class="panel"><p class="eyebrow">YOUR ENTRIES</p>${d.myEntries.length ? d.myEntries.map(entry => `<div class="saved-entry"><div class="row"><strong>${esc(entry.blendName)}</strong><span class="badge ${entry.status === 'submitted' ? 'good' : ''}">${esc(entry.status)}</span></div><p>${esc(entry.batchName || 'Next competition intake')}</p>${entry.submittedAt ? `<p>Locked ${esc(date(entry.submittedAt))}</p>` : ''}</div>`).join('') : `<p>Your first saved draft will appear here. ${state.preview ? 'This is a shared example captain; no account is needed.' : 'Sign in on another device to pick up where you left off.'}</p>`}</article></div></div>`;
 }
 function resultsPanel() {
   const d = state.data;
@@ -111,7 +116,8 @@ function judgePanel() {
   if (!account().signedIn) return authPanel();
   const tasks = state.judge?.tasks;
   if (!tasks?.length) return '<article class="panel"><p class="eyebrow">BLIND JUDGING</p><h2>No assigned flight yet.</h2><p>The producer must assign your existing account to a judging batch. This desk never shows other judges’ scorecards or team identities.</p></article>';
-  return tasks.map(task => `<article class="panel"><div class="row"><div><p class="eyebrow">PRIVATE JUDGE DESK · ${esc(task.judgeName)}</p><h2>${esc(task.batchName)}</h2></div><span class="badge">${esc(task.status)}</span></div><p class="fine">${esc(state.judge.scoring)} Your notes stay private. A locked card cannot be changed.</p>
+  const selector = state.preview ? `<article class="panel"><p class="eyebrow">TRY A JUDGE · NO LOGIN REQUIRED</p><label class="field"><span>Demo judge</span><select id="preview-judge">${state.preview.judges.map(j => `<option value="${esc(j.key)}" ${j.key === state.previewJudge ? 'selected' : ''}>${esc(j.name)}</option>`).join('')}</select></label><p class="fine">Each demo judge has their own scorecards. You can switch between them here. Scores still lock normally; reset the shared demo to start over.</p></article>` : '';
+  return selector + tasks.map(task => `<article class="panel"><div class="row"><div><p class="eyebrow">${state.preview ? 'DEMO' : 'PRIVATE'} JUDGE DESK · ${esc(task.judgeName)}</p><h2>${esc(task.batchName)}</h2></div><span class="badge">${esc(task.status)}</span></div><p class="fine">${esc(state.judge.scoring)} ${state.preview ? 'Example notes are visible to anyone switching demo judges.' : 'Your notes stay private.'} A locked card cannot be changed.</p>
     ${task.entries.map(entry => {const card = task.cards.find(c => c.entryId === entry.id), locked = card?.lockedAt != null || task.status === 'complete'; return `<form class="scorecard ${locked ? 'locked' : ''}" data-batch="${esc(task.batchId)}" data-entry="${esc(entry.id)}" data-revision="${card?.revision || 0}"><div class="row"><h3>${esc(entry.sample)}</h3><span class="badge ${locked ? 'good' : ''}">${locked ? 'LOCKED' : card ? 'SAVED DRAFT' : 'NOT SCORED'}</span></div><div class="score-grid">${['aroma','palate','balance','finish'].map(key => `<label>${key[0].toUpperCase() + key.slice(1)} / 25<input name="${key}" type="number" min="0" max="25" step="1" inputmode="numeric" value="${card?.[key] ?? ''}" required ${locked ? 'disabled' : ''}></label>`).join('')}</div><label class="sr-only" for="notes-${esc(entry.id)}">Private tasting notes for ${esc(entry.sample)}</label><textarea id="notes-${esc(entry.id)}" name="notes" maxlength="1000" placeholder="Private tasting notes" ${locked ? 'disabled' : ''}>${esc(card?.notes || '')}</textarea>${locked ? `<p class="fine">Your total: ${['aroma','palate','balance','finish'].reduce((n,k) => n + (card?.[k] || 0), 0)} / 100</p>` : `<div class="actions">${button('Save scorecard', 'type="submit" data-lock="false"')}${button('Lock final scorecard', 'type="submit" data-lock="true"', true)}</div>`}</form>`;}).join('')}</article>`).join('');
 }
 function componentsText(components) {return components.map(c => c.code + ' | ' + c.name).join('\n');}
@@ -128,17 +134,18 @@ function hostPanel() {
   if (!account().signedIn) return authPanel();
   if (!(state.data?.canManage || state.index?.canManage)) return '<article class="panel"><h2>Producer access required.</h2><p>This account does not have permission to manage competitions.</p></article>';
   if (!state.code || !state.host) return `<article class="panel"><p class="eyebrow">FIRST SEASON SETUP</p><h2>Create the competition.</h2>${seasonForm(true)}</article>`;
-  return `<article class="panel"><div class="row"><div><p class="eyebrow">PRODUCER DESK</p><h2>Run the show. Keep entry open.</h2></div>${button('Refresh', 'id="refresh-host"')}</div><p>New viewers use the existing Bourbon Games player. New blends enter the next eligible batch. The sample map below is private to administrators.</p><details><summary>Edit season, components and qualification places</summary>${seasonForm()}</details><details><summary>Add the next judging batch</summary>${batchForm()}</details></article>
+  return `<article class="panel"><div class="row"><div><p class="eyebrow">PRODUCER DESK</p><h2>Run the show. Keep entry open.</h2></div>${button('Refresh', 'id="refresh-host"')}</div><p>New viewers use the existing Bourbon Games player. New blends enter the next eligible batch. ${state.preview ? 'This is an open demo: the example sample map is visible to anyone here.' : 'The sample map below is private to administrators.'}</p>${state.preview ? `<div class="hero-actions">${button('Lock demo scorecards','id="preview-lock-scores"',true)}${button('Reset shared demo','data-preview-reset')}</div><p class="fine">Lock demo scorecards uses the current example drafts so you can rehearse the reveal without scoring every sample. It does not change already-locked cards.</p>` : ''}<details><summary>Edit season, components and qualification places</summary>${seasonForm()}</details><details><summary>Add the next judging batch</summary>${batchForm()}</details></article>
     ${state.host.batches.map(batch => {const event = batch.event, phase = event?.phase; const ready = batch.status === 'accepting' && batch.closes_at <= state.data.serverTime && batch.entries.filter(r => r.status === 'submitted').length >= 2; return `<article class="panel host-batch"><div class="row"><div><p class="eyebrow">${esc(batch.stage)} · ${esc(batch.status)}</p><h2>${esc(batch.name)}</h2></div><span class="badge">${batch.slots} PLACES</span></div><p class="fine">Recipe deadline: ${esc(date(batch.closes_at))}</p><div class="stats"><span><strong>${batch.entries.filter(r => r.status === 'submitted').length}</strong>locked blends</span><span><strong>${batch.lockedCards} / ${batch.expectedCards || '—'}</strong>locked scorecards</span>${event ? `<span><strong>${esc(phase)}</strong>show state</span>` : ''}</div>
       ${batch.status === 'accepting' ? `${button('Prepare blind flight', `data-prepare="${esc(batch.id)}" ${ready ? '' : 'disabled'}`, true)}<details><summary>Edit this judging batch</summary>${batchForm(batch)}</details>` : batch.status === 'prepared' ? `<div class="actions">${button('Open next prediction', `data-advance="open" data-batch="${esc(batch.id)}" ${['lobby','results'].includes(phase) && event.outcomes.length < event.matchups.length ? '' : 'disabled'}`, true)}${button('Close picks', `data-advance="close" data-batch="${esc(batch.id)}" ${phase === 'predictions' ? '' : 'disabled'}`)}${button('Reveal actual result', `data-advance="reveal" data-batch="${esc(batch.id)}" ${phase === 'judging' && batch.allScoresLocked ? '' : 'disabled'}`)}${button('Complete & qualify', `data-advance="complete" data-batch="${esc(batch.id)}" ${phase === 'results' && event.outcomes.length === event.matchups.length ? '' : 'disabled'}`)}</div><p class="fine">Prediction windows last 2 minutes here. All scorecards must be locked before a result can be revealed. Exact unresolved ties block publication.</p><a class="button outline" href="/games/${encode(event.code)}" target="_blank" rel="noopener">Open player screen ↗</a>` : `<p class="fine">Flight completed. Scores and awarded places are published; the next intake remains independent.</p>`}
-      ${batch.resolution_note ? `<p class="notice">${esc(batch.resolution_note)}</p>` : ''}<details><summary>Private sample packing map · never show on stream</summary><ol class="packing">${batch.entries.filter(r => r.status === 'submitted').map(row => `<li><strong>${esc(row.sample || 'Not prepared')} — ${esc(row.teamName)} / ${esc(row.blendName)}</strong><br>${row.recipe.map(r => esc(r.code) + ': ' + (r.bps / 100).toFixed(2) + '%').join(' · ')}</li>`).join('') || '<li>No submitted blends yet.</li>'}</ol></details></article>`;}).join('')}
+      ${batch.resolution_note ? `<p class="notice">${esc(batch.resolution_note)}</p>` : ''}<details><summary>${state.preview ? 'Demo sample packing map · shared test data' : 'Private sample packing map · never show on stream'}</summary><ol class="packing">${batch.entries.filter(r => r.status === 'submitted').map(row => `<li><strong>${esc(row.sample || 'Not prepared')} — ${esc(row.teamName)} / ${esc(row.blendName)}</strong><br>${row.recipe.map(r => esc(r.code) + ': ' + (r.bps / 100).toFixed(2) + '%').join(' · ')}</li>`).join('') || '<li>No submitted blends yet.</li>'}</ol></details></article>`;}).join('')}
     ${state.host.queued.length ? `<article class="panel"><p class="eyebrow">NEXT-COMPETITION INTAKE QUEUE</p><h2>${state.host.queued.length} saved entries</h2><p>These are not in a locked championship. Publish the next intake and arrange explicit placement; the pilot does not silently assign queued blends to another season.</p>${state.host.queued.map(row => `<div class="saved-entry"><strong>${esc(row.teamName)} · ${esc(row.blendName)}</strong><p>${esc(date(row.submittedAt))}</p></div>`).join('')}</article>` : ''}`;
 }
 function header() {
   const d = state.data, event = d?.spotlight, target = d?.intake;
-  $('#account-button').textContent = account().signedIn ? 'My account' : 'Sign in';
+  $('#account-button').textContent = state.preview ? 'Reset demo' : account().signedIn ? 'My account' : 'Sign in';
   $('#host-tab').hidden = !(d?.canManage || state.index?.canManage);
-  $('#test-ribbon').hidden = !d?.season.isTest;
+  $('#test-ribbon').hidden = !(state.preview || d?.season.isTest);
+  if (state.preview) $('#test-ribbon').textContent = 'OPEN BUILD PREVIEW · SHARED TEST DATA · JUDGE & PRODUCER ACCESS OPEN · RESETS ON RESTART';
   $('#season-name').textContent = d?.season.name || 'One competition. Two ways in.';
   $('#season-strip').innerHTML = (d?.season.stages || []).map((stage, i) => `<div class="milestone"><span>${['01 / FIRST QUALIFIERS','02 / KEEP COMPETING','03 / STILL A WAY IN','04 / THE FINAL'][i]}</span><strong>${esc(stage.label)}</strong><small>${stage.key === 'final' ? 'Fresh blends. Scores reset.' : `${stage.slots} championship places reserved`}</small></div>`).join('');
   $('#live-card-content').innerHTML = event ? `<p class="eyebrow">${event.phase === 'predictions' ? 'PREDICTIONS OPEN' : 'JOIN THE ROOM'} <span class="small-tag">${d.season.isTest ? 'TEST FLIGHT' : 'LIVE EVENT'}</span></p><h2>${esc(event.name.replace(' · Test event',''))}</h2><p>${event.phase === 'predictions' ? 'Your next winning call starts here. Picks lock ' + esc(date(event.phaseDeadline)) + '.' : 'The room is open. Join now; play the next unlocked prediction.'}</p><div class="card-line"><div><p class="eyebrow">SCAN. JOIN. PLAY.</p><p>One phone per player.</p></div><img class="qr" src="/blending-qr/${encode(d.season.code)}.svg" alt="QR code to join this Bourbon Games season"></div>` : `<p class="eyebrow">ENTRY IS OPEN <span class="small-tag">AT HOME</span></p><h2>${esc(target?.name || 'The next flight is coming.')}</h2><p>${esc(target?.explanation || 'The producer is preparing the first competition.')}</p><div class="card-line"><div><p class="eyebrow">YOUR NEXT OPPORTUNITY</p><p>${esc(date(target?.closesAt))}</p></div></div>`;
@@ -152,7 +159,25 @@ function render() {
   wire();
 }
 function parseComponents(value) {return value.split('\n').filter(line => line.trim()).map(line => {const [code,...name] = line.split('|'); return {code: code.trim(), name: name.join('|').trim()};});}
+async function resetPreview() {
+  if (!confirm('Reset the shared demo for everyone? All preview-only changes and picks will be cleared.')) return;
+  await action(async () => {
+    await api('/api/open-preview/reset', {});
+    state.previewChecked = false; state.host = null; state.judge = null;
+    state.code = 'TRYBG'; state.previewJudge = '1';
+    history.replaceState(null, '', '/blending/TRYBG?view=' + encode(state.view));
+  }, 'Shared demo reset. You can try every button again.');
+}
 function wire() {
+  document.querySelectorAll('[data-preview-reset]').forEach(node => node.onclick = resetPreview);
+  if ($('#preview-judge')) $('#preview-judge').onchange = event => {
+    const choice = event.currentTarget.value;
+    action(async () => { state.previewJudge = choice; }, 'Switched demo judge.');
+  };
+  if ($('#preview-lock-scores')) $('#preview-lock-scores').onclick = () => {
+    if (!confirm('Lock the current demo scorecard drafts so the producer can reveal the results?')) return;
+    action(() => api('/api/open-preview/lock-scores', {}), 'Demo scorecards locked. Close picks before revealing results.');
+  };
   document.querySelectorAll('[data-go]').forEach(node => node.onclick = () => changeView(node.dataset.go));
   if ($('#auth-switch')) $('#auth-switch').onclick = () => {state.authMode = state.authMode === 'login' ? 'register' : 'login'; render();};
   if ($('#logout')) $('#logout').onclick = () => action(async () => {await api('/api/auth/logout', {}); state.host = null; state.judge = null; state.view = 'play';}, 'Signed out. Your saved entries remain in your account.');
@@ -173,7 +198,7 @@ function wire() {
       const recipe = inputs.map(field => ({code: field.dataset.component, bps: Math.round(Number(field.value) * 100)}));
       if (submit && !confirm('Submit this exact recipe to ' + state.data.intake.name + '? The recipe will be locked.')) return;
       const path = '/api/public/blending/' + encode(state.code) + '/entries' + (recipeForm.dataset.id ? '/' + encode(recipeForm.dataset.id) : '');
-      action(() => api(path, {...input, recipe, age21: input.age21 === 'on', expectedRevision: Number(recipeForm.dataset.revision), submit, expectedTarget: recipeForm.dataset.target, acceptQueue: $('#accept-queue')?.checked === true}), submit ? 'Recipe submitted and locked. Your judging destination is shown under Your entries.' : 'Draft saved to your account.');
+      action(() => api(path, {...input, recipe, age21: input.age21 === 'on', expectedRevision: Number(recipeForm.dataset.revision), submit, expectedTarget: recipeForm.dataset.target, acceptQueue: $('#accept-queue')?.checked === true}), submit ? 'Recipe submitted and locked. Your judging destination is shown under Your entries.' : state.preview ? 'Draft saved in the shared demo.' : 'Draft saved to your account.');
     };
   }
   document.querySelectorAll('.scorecard:not(.locked)').forEach(form => form.onsubmit = event => {
@@ -203,6 +228,11 @@ function wire() {
   });
 }
 async function load(poll = false) {
+  if (!state.previewChecked) {
+    const response = await fetch('/api/open-preview', {credentials:'same-origin', cache:'no-store'});
+    state.preview = response.ok ? await response.json() : null;
+    state.previewChecked = true;
+  }
   if (!poll) state.index = await api('/api/public/blending');
   if (!state.code) state.code = state.index.seasons[0]?.code || '';
   if (state.code) {
@@ -217,7 +247,7 @@ async function load(poll = false) {
 }
 $('#join-main').onclick = () => {if (state.data?.spotlight) location.assign('/games/' + encode(state.data.spotlight.code)); else changeView('play');};
 $('#enter-main').onclick = () => changeView('enter');
-$('#account-button').onclick = () => changeView('account');
+$('#account-button').onclick = () => state.preview ? resetPreview() : changeView('account');
 document.querySelectorAll('.tabs [data-view]').forEach(node => node.onclick = () => changeView(node.dataset.view));
 load().catch(error => {notice(error.message, true); $('#workspace').innerHTML = '<article class="panel"><h2>The pilot is not available yet.</h2><p>Nothing has been submitted. The producer needs to enable and configure this pilot before people can enter.</p></article>';});
 setInterval(() => {if (state.code && !state.busy && document.visibilityState === 'visible') load(true).catch(() => {state.online = false; notice('Connection lost. The last displayed state may be out of date. Reconnect before submitting; the server controls every lock.', true);});}, 4000);

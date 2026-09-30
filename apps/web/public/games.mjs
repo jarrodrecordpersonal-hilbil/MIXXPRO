@@ -33,6 +33,7 @@ function updateClock(){
 }
 function render(data){
   state=data;offset=data.serverTime-Date.now();
+  $('open-preview-banner')?.classList.toggle('hidden',!data.openPreview);
   $('title').textContent=data.event.name;$('event-code').textContent=data.event.code;
   $('venue-context').textContent=data.venue?'Joining through '+data.venue.name:venueCode?'This venue link is not currently active.':'At the venue. At home. In the game.';
   if(venueCode&&!data.venue){const home=document.createElement('a');home.href='/games/'+encodeURIComponent(code);home.textContent=' Join from home instead.';$('venue-context').append(home);}
