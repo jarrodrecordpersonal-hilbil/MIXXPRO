@@ -4,7 +4,7 @@ const phaseLabels={lobby:'Lobby',predictions:'Predictions open',judging:'Judging
 const opts=items=>items.map(([value,label])=>`<option value="${h(value)}">${h(label)}</option>`).join('');
 
 export function gameHostPage(){
-  return `<header class="header"><div><div class="eyebrow">BOURBON GAMES</div><h1>Bourbon Games.</h1><p>Bring the tasting to your TVs. Let guests play along on their phones.</p></div></header><div data-game-host class="game-host"><p role="status" data-host-status aria-live="polite">Loading events…</p><div data-host-content></div></div>`;
+  return `<header class="header"><div><div class="eyebrow">MIXXPLAY / LIVE FORMATS</div><h1>Turn the room into the game.</h1><p>Run Whiskey Draft on your TVs. Guests play from their phones—in the venue or at home.</p></div></header><div data-game-host class="game-host"><p role="status" data-host-status aria-live="polite">Loading events…</p><div data-host-content></div></div>`;
 }
 
 export function mountGameHost({root,api,demo,isAdmin,onNavigate}){
@@ -20,7 +20,7 @@ export function mountGameHost({root,api,demo,isAdmin,onNavigate}){
   function draw(){
     if(disposed)return;
     const previous=selected;
-    content.innerHTML=`<section class="panel"><div class="section-head"><h2>${events.length?'Your available events':connected?'No live event available yet':'Checking available events…'}</h2><button type="button" class="btn secondary small" data-host-action="refresh">Refresh</button></div>${events.length?`<label class="field"><span class="label">Event</span><select data-host-event aria-label="Event">${opts(events.map(e=>[e.id,e.name+' · '+phaseLabels[e.phase]]))}</select></label>`:`<p>${connected?'Published events will appear here. Until an event opens, there is no guest QR or live game to present.':'Checking the event list. You can explore the preview below while it loads.'}</p>${connected?'<p class="small">Live event setup and host assignments are the next step for the pilot. Creating events is not available in this portal yet.</p>':''}<div class="actions section"><button type="button" class="btn secondary" data-host-nav="tvs">Open TV controls</button></div>`}${demo&&isAdmin?'<button type="button" class="btn secondary" data-host-action="demo">Open fictional demo</button><p class="small">Uses the existing Proof Trials test event. It does not reset completed events.</p>':''}</section><div data-host-event-panel></div>${events.length?'':gamePreview()}`;
+    content.innerHTML=`<section class="panel"><div class="section-head"><h2>${events.length?'Your available events':connected?'No live event available yet':'Checking available events…'}</h2><button type="button" class="btn secondary small" data-host-action="refresh">Refresh</button></div>${events.length?`<label class="field"><span class="label">Event</span><select data-host-event aria-label="Event">${opts(events.map(e=>[e.id,e.name+' · '+phaseLabels[e.phase]]))}</select></label>`:`<p>${connected?'Published events will appear here. Until an event opens, there is no guest QR or live game to present.':'Checking the event list. You can explore the preview below while it loads.'}</p>${connected?'<p class="small">Live event setup and host assignments are the next step for the pilot. Creating events is not available in this portal yet.</p>':''}<div class="actions section"><button type="button" class="btn secondary" data-host-nav="tvs">Open TV controls</button></div>`}${demo&&isAdmin?'<button type="button" class="btn secondary" data-host-action="demo">Open Whiskey Draft demo</button><p class="small">Creates a fictional opening-night draft. Safe for product testing and does not reset completed events.</p>':''}</section><div data-host-event-panel></div>${events.length?'':gamePreview()}`;
     renderGamePreview(root,previewView,previewPick);
     const select=content.querySelector('[data-host-event]');if(select)select.value=previous;
     if(!snapshot){disable();return;}
@@ -91,7 +91,7 @@ export function mountGameHost({root,api,demo,isAdmin,onNavigate}){
     const button=event.target.closest('[data-host-action]');if(!button||button.disabled)return;
     const action=button.dataset.hostAction;
     if(action==='refresh')return run(async()=>{},'Up to date.');
-    if(action==='demo')return run(async()=>{const result=await api('/admin/games/proof-trials-demo',{});selected=result.id;},'Fictional demo opened.');
+    if(action==='demo')return run(async()=>{const result=await api('/admin/games/whiskey-draft-demo',{});selected=result.id;},'Whiskey Draft demo opened.');
     if(action==='stop')return run(()=>api('/games/'+selected+'/stop-presenting',{groupName:button.dataset.group}),'Presentation stopped for that group.');
     if(action==='complete'&&confirm('End this event for everyone? Predictions and judging will close, and TVs will return to their programming.'))return run(()=>api('/games/'+selected+'/phase',{phase:'complete',expectedRevision:snapshot.event.stateRevision}),'Event ended.');
   });

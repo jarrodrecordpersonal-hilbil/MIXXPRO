@@ -30,6 +30,20 @@ export async function gameRoutes(context){
    const firstJudge=db.get('SELECT id FROM tasting_judges WHERE event_id=? ORDER BY name LIMIT 1',eventId);if(firstJudge)db.run('INSERT INTO tasting_judge_users(judge_id,user_id,created_at) VALUES(?,?,?)',firstJudge.id,user.id,created);
   });audit(user.id,null,'proof_trials.demo_created',{eventId});return json(res,201,{ok:true,id:eventId,code:'PROOF26'});
  }
+ if(method==='POST'&&path==='/api/admin/games/whiskey-draft-demo'){
+  const user=admin(req);if(!config.DEMO_MODE)fail(403,'Whiskey Draft fixtures are available only in demo mode.');
+  const existing=db.get("SELECT id,code FROM tasting_events WHERE code='DRAFT26'");if(existing){db.run("INSERT OR IGNORE INTO game_team_rules(event_id,team_size) SELECT id,5 FROM tasting_events WHERE id=? AND phase='lobby' AND status IN ('open','live')",existing.id);return json(res,200,{ok:true,...existing});}
+  const eventId=id(),created=now(),names=['Honey Barrel','High Rye','Charred Oak','River Proof'];
+  transaction(()=>{db.run("INSERT INTO tasting_events(id,code,name,status,created_at,updated_at) VALUES(?,?,?,?,?,?)",eventId,'DRAFT26','Whiskey Draft · Opening Night','open',created,created);
+   db.run('INSERT INTO game_team_rules(event_id,team_size) VALUES(?,5)',eventId);
+   const entryIds=names.map((name,i)=>{const x=id();db.run('INSERT INTO tasting_entries(id,event_id,seed,name,story) VALUES(?,?,?,?,?)',x,eventId,i+1,name,'Fictional whiskey profile for product testing.');return x;});
+   db.run('INSERT INTO tasting_matchups(id,event_id,round,slot,entry_a_id,entry_b_id) VALUES(?,?,?,?,?,?)',id(),eventId,1,1,entryIds[0],entryIds[1]);
+   db.run('INSERT INTO tasting_matchups(id,event_id,round,slot,entry_a_id,entry_b_id) VALUES(?,?,?,?,?,?)',id(),eventId,1,2,entryIds[2],entryIds[3]);
+   for(const name of ['The House','Guest Judge'])db.run('INSERT INTO tasting_judges(id,event_id,name) VALUES(?,?,?)',id(),eventId,name);
+   db.run('INSERT INTO tasting_event_operators(event_id,user_id,created_at) VALUES(?,?,?)',eventId,user.id,created);
+   const firstJudge=db.get('SELECT id FROM tasting_judges WHERE event_id=? ORDER BY name LIMIT 1',eventId);if(firstJudge)db.run('INSERT INTO tasting_judge_users(judge_id,user_id,created_at) VALUES(?,?,?)',firstJudge.id,user.id,created);
+  });audit(user.id,null,'whiskey_draft.demo_created',{eventId});return json(res,201,{ok:true,id:eventId,code:'DRAFT26'});
+ }
  if(method==='POST'&&path.startsWith('/api/public/games/')&&path.endsWith('/link-device')){
   const code=path.split('/')[4],event=db.get("SELECT * FROM tasting_events WHERE code=? AND status!='draft'",code);if(!event)fail(404,'Event not found.');
   const raw=participantCookie(req);const participant=participantFor(context,event.id);if(!participant)fail(401,'Join the event first.');
