@@ -7,7 +7,7 @@ function brand(){
     mark.dataset.mixxwaveBrand='true';
     mark.classList.add('mixxwave-wordmark');
     mark.setAttribute('aria-label','MIXXWAVE');
-    mark.innerHTML='<img src="/mixxwave-logo.svg" alt="MIXXWAVE">';
+    mark.innerHTML='<img src="/mixxwave-logo.svg?v=2" alt="MIXXWAVE">';
   }
   if(!document.getElementById('mixxwave-brand-style')){
     const style=document.createElement('style');style.id='mixxwave-brand-style';
