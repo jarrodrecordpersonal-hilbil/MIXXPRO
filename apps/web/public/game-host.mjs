@@ -4,7 +4,7 @@ const phaseLabels={lobby:'Lobby',predictions:'Predictions open',judging:'Judging
 const opts=items=>items.map(([value,label])=>`<option value="${h(value)}">${h(label)}</option>`).join('');
 
 export function gameHostPage(){
-  return `<header class="header"><div><div class="eyebrow">MIXXPLAY / LIVE FORMATS</div><h1>Turn the room into the game.</h1><p>Run Whiskey Draft on your TVs. Guests play from their phones—in the venue or at home.</p></div></header><div data-game-host class="game-host"><p role="status" data-host-status aria-live="polite">Loading events…</p><div data-host-content></div></div>`;
+  return `<header class="header"><div><img class="game-format-logo" src="/whiskey-draft-logo.svg" alt="Whiskey Draft"><div class="eyebrow">MIXXPLAY / LIVE FORMATS</div><h1>Turn the room into the game.</h1><p>Run Whiskey Draft on your TVs. Guests play from their phones—in the venue or at home.</p></div></header><div data-game-host class="game-host"><p role="status" data-host-status aria-live="polite">Loading events…</p><div data-host-content></div></div>`;
 }
 
 export function mountGameHost({root,api,demo,isAdmin,onNavigate}){

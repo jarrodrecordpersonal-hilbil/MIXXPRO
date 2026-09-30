@@ -8,6 +8,7 @@
 footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:40px;padding:24px 0;border-top:1px solid var(--line);font-size:9px;letter-spacing:1.8px;color:var(--muted)}
 @media(min-width:760px){#join,#resume{max-width:540px;margin-left:auto;margin-right:auto}.game-grid:has(>article:nth-child(2)){grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.game-home{padding:22px 18px 0}.game-hero{padding:40px 0 24px}.game-panel{padding:22px 18px}.compact{padding:18px}.pick button{padding:13px}.phase-line{font-size:13px}.event-code{max-width:76px;overflow-wrap:anywhere}.game-wordmark{font-size:10px;letter-spacing:1.5px}.monogram{width:36px;height:36px;flex-shrink:0}.small-tag{display:none}}
+.game-wordmark>a{display:block;width:165px;background:var(--paper);border-radius:9px;padding:3px 7px}.game-wordmark>a img{display:block;width:100%;height:auto}@media(max-width:620px){.game-wordmark>a{width:135px}}
 @media(prefers-reduced-motion:no-preference){.pick button{transition:border-color .15s,background .15s}.primary:hover{background:#e8c992}}
 body[data-connected=false] .live-dot{background:var(--muted)}body[data-connected=false] .small-tag{visibility:hidden}
 
