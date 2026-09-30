@@ -166,4 +166,6 @@ document.addEventListener('submit',async e=>{
   }catch(err){if(error)error.textContent=err.message;else toast(err.message,true);}finally{S.busy=false;if(submit.isConnected)submit.disabled=false;}
 });
 setInterval(async()=>{if(S.session&&S.venueId&&['home','tvs'].includes(S.page)&&!$('#dialog').open&&!S.busy){try{await loadData();render();}catch(e){if(e.status===401){S.session=null;render();}}}},15000);
+const versionBrandLogo=()=>document.querySelectorAll('img[src="/mixxwave-logo.svg"]').forEach(image=>{image.src='/mixxwave-logo.svg?v=2';});
+new MutationObserver(versionBrandLogo).observe(document.getElementById('app'),{childList:true,subtree:true});versionBrandLogo();
 start().catch(e=>{document.querySelector('#app').textContent='Unable to open MIXXPRO. '+e.message;});
