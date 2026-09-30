@@ -1,4 +1,4 @@
-"""One synthetic Proof Trials event, a paired TV and four independent guests."""
+"""One synthetic Whiskey Draft event, a paired TV and four independent guests."""
 import sqlite3
 from playwright.sync_api import expect
 
@@ -14,9 +14,9 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
         host.locator('[data-page="games"]').first.wait_for(state='attached')
         nav(host, 'games')
         expect(host.locator('[data-host-status]')).to_have_text('Up to date.')
-        host.get_by_role('button', name='Open fictional demo', exact=True).click()
+        host.get_by_role('button', name='Open Whiskey Draft demo', exact=True).click()
         expect(host.locator('[data-host-phase]')).to_have_text('Lobby')
-        event = owner.request.get(base + '/api/public/games/PROOF26').json()['event']
+        event = owner.request.get(base + '/api/public/games/DRAFT26').json()['event']
         event_id = event['id']
         matchup, judge = event['matchups'][0], event['judges'][0]
         entry_name = '<i data-entry-injected>Oak</i>'
@@ -47,12 +47,12 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
 
         present()
         wait(player, "!document.getElementById('game-stage').classList.contains('hidden')", timeout=12000)
-        expect(player.locator('#game-join')).to_contain_text('PROOF26')
+        expect(player.locator('#game-join')).to_contain_text('DRAFT26')
         expect(player.locator('#game-matchups')).to_contain_text(entry_name)
         assert player.locator('[data-entry-injected]').count() == 0
         host.get_by_role('button', name='Stop showing', exact=True).click()
         expect(player.locator('#game-stage')).to_be_hidden(timeout=12000)
-        assert owner.request.get(base + '/api/public/games/PROOF26').json()['event']['status'] == 'open'
+        assert owner.request.get(base + '/api/public/games/DRAFT26').json()['event']['status'] == 'open'
         present()
         expect(player.locator('#game-stage')).to_be_visible(timeout=12000)
         passed('Host opens the fictional demo, presents it to a TV group and stops presentation without ending the shared event')
@@ -69,7 +69,7 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
             contexts.append(context)
             page = context.new_page()
             page.on('pageerror', lambda error: errors.append(str(error)))
-            page.goto(base + '/games/PROOF26' + ('?v=' + venue_code if name == 'Venue Morgan' else ''))
+            page.goto(base + '/games/DRAFT26' + ('?v=' + venue_code if name == 'Venue Morgan' else ''))
             expect(page.get_by_role('heading', name='Join the tasting')).to_be_visible()
             if name == 'Home Taylor':
                 page.locator('#resume summary').click()
@@ -79,7 +79,7 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
             page.locator('#join-form input[name="name"]').fill(name)
             page.locator('#join-form button[type="submit"]').click()
             expect(page.locator('#play')).to_be_visible()
-            participant = context.request.get(base + '/api/public/games/PROOF26').json()['participant']
+            participant = context.request.get(base + '/api/public/games/DRAFT26').json()['participant']
             guests.append((context, page, participant['id']))
             if name == 'Venue Morgan':
                 expect(page.locator('#venue-context')).to_contain_text('Joining through')
@@ -110,7 +110,7 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
         first_context, home, participant_id = guests[0]
         home.reload()
         expect(home.locator('#play')).to_be_visible()
-        assert first_context.request.get(base + '/api/public/games/PROOF26').json()['participant']['id'] == participant_id
+        assert first_context.request.get(base + '/api/public/games/DRAFT26').json()['participant']['id'] == participant_id
         for kind in ['bracket', 'judge']:
             button = home.locator(f'[data-pick][data-kind="{kind}"][data-entry="{matchup["entryAId"]}"]' + (f'[data-judge="{judge["id"]}"]' if kind == 'judge' else ''))
             expect(button).to_have_attribute('aria-pressed', 'true')
@@ -126,12 +126,12 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
             assert response.status == 200
             submissions.append(1)
             route.abort()
-        home.route('**/api/public/games/PROOF26/predict', lose_response)
+        home.route('**/api/public/games/DRAFT26/predict', lose_response)
         home.locator(f'[data-pick][data-kind="bracket"][data-entry="{matchup["entryBId"]}"]').click()
         expect(home.locator('#feedback')).to_contain_text('Reconnected.', timeout=12000)
         expect(home.locator(f'[data-pick][data-kind="bracket"][data-entry="{matchup["entryBId"]}"]')).to_have_attribute('aria-pressed', 'true')
         assert len(submissions) == 1, 'uncertain writes must not be retried'
-        home.unroute('**/api/public/games/PROOF26/predict')
+        home.unroute('**/api/public/games/DRAFT26/predict')
         home.locator(f'[data-pick][data-kind="bracket"][data-entry="{matchup["entryAId"]}"]').click()
         expect(home.locator(f'[data-pick][data-kind="bracket"][data-entry="{matchup["entryAId"]}"]')).to_have_attribute('aria-pressed', 'true')
         home.screenshot(path=str(out / 'bourbon-games-phone-picks.png'), full_page=True)
@@ -143,7 +143,7 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
         expect(player.locator('#game-connection')).to_have_text('Live event', timeout=12000)
         expect(player.locator('#game-qr-box')).to_be_visible()
         passed('TV connection loss labels the last event state and restores the join QR after reconnecting')
-        assert len(owner.request.get(base + '/api/public/games/PROOF26').json()['standings']) == 4
+        assert len(owner.request.get(base + '/api/public/games/DRAFT26').json()['standings']) == 4
         response = first_context.request.post(base + f'/api/games/{event_id}/phase', data={'phase': 'complete'})
         assert response.status == 401, 'guest cookies must not grant event control'
         passed('Four guest browsers submit to one shared event, preserve identity on reload and cannot control the host')
@@ -163,7 +163,7 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
         assert conflict.value.status == 409
         expect(second_host.locator('[data-host-status]')).to_contain_text('Your action was not applied')
         expect(second_host.locator('[data-host-phase]')).to_have_text('Judging')
-        assert owner.request.get(base + '/api/public/games/PROOF26').json()['event']['phase'] == 'judging'
+        assert owner.request.get(base + '/api/public/games/DRAFT26').json()['event']['phase'] == 'judging'
         second_host.close()
         second_host = None
         passed('A stale host tab cannot overwrite the current phase and refreshes with an explicit conflict message')
@@ -180,8 +180,8 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
         host.get_by_role('button', name='Submit judge choice', exact=True).click()
         expect(host.locator('[data-host-judge-saved]')).to_contain_text(entry_name)
         passed('Host connection failures disable mutations until refresh; the assigned judge submits a choice through the UI')
-        assert all(row['totalPoints'] == 0 for row in first_context.request.get(base + '/api/public/games/PROOF26').json()['standings'])
-        response = first_context.request.post(base + '/api/public/games/PROOF26/predict',
+        assert all(row['totalPoints'] == 0 for row in first_context.request.get(base + '/api/public/games/DRAFT26').json()['standings'])
+        response = first_context.request.post(base + '/api/public/games/DRAFT26/predict',
             data={'matchupId': matchup['id'], 'entryId': matchup['entryBId'], 'kind': 'bracket'})
         assert response.status == 409, 'late predictions must remain closed'
         for revision, (winner, points) in enumerate([(matchup['entryAId'], [2, 1, 1, 0]), (matchup['entryBId'], [1, 2, 0, 1])], start=1):
