@@ -102,7 +102,10 @@ with (OUT/'server.log').open('w') as log:
     expect(player.locator('[data-kind=bracket][aria-pressed=true]')).to_have_count(1)
     # The saved optional pick remains stored, even when the bonus details start collapsed on a fresh page.
     expect(player.locator('[data-kind=judge][aria-pressed=true]')).to_have_count(1)
-    fit(player);player.screenshot(path=str(OUT/'03-player-pick-phone.png'),full_page=True)
+    fit(player)
+    main_pick=player.locator('[data-kind=bracket]').first.bounding_box()
+    assert main_pick['y']+main_pick['height'] <= 844, 'Main phone pick should fit before the first scroll'
+    player.screenshot(path=str(OUT/'03-player-pick-phone.png'),full_page=True)
     passed('One-name guest entry, a single active matchup, optional bonus picks, and server-confirmed choices restored after refresh')
 
     player.locator('#watch-drawer>summary').click()
