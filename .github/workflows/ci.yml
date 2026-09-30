@@ -65,6 +65,8 @@ jobs:
         run: python tests/blending_open_preview_browser.py
       - name: Sports scoreboard and simple blending browser acceptance
         run: python tests/blending_sports_browser.py
+      - name: MIXX TANK media and branded-thumbnail browser acceptance
+        run: python tests/blending_media_browser.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
