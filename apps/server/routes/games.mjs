@@ -44,6 +44,28 @@ export async function gameRoutes(context){
    const firstJudge=db.get('SELECT id FROM tasting_judges WHERE event_id=? ORDER BY name LIMIT 1',eventId);if(firstJudge)db.run('INSERT INTO tasting_judge_users(judge_id,user_id,created_at) VALUES(?,?,?)',firstJudge.id,user.id,created);
   });audit(user.id,null,'whiskey_draft.demo_created',{eventId});return json(res,201,{ok:true,id:eventId,code:'DRAFT26'});
  }
+ if(method==='POST'&&path==='/api/admin/games/whiskey-draft'){
+  const user=admin(req),eventName=text(b.name,'Event name',80),code=text(b.code,'Event code',12).toUpperCase();
+  if(!/^[A-Z0-9_-]{4,12}$/.test(code))fail(400,'Event code must be 4–12 letters, numbers, dashes or underscores.');
+  if(db.get('SELECT 1 FROM tasting_events WHERE code=?',code))fail(409,'That event code is already in use.');
+  const entries=[b.entry1,b.entry2,b.entry3,b.entry4].map((value,i)=>text(value,`Pour ${i+1}`,50));
+  const judges=[b.judge1,b.judge2].filter(value=>typeof value==='string'&&value.trim()).map((value,i)=>text(value,`Judge ${i+1}`,50));
+  if(new Set(entries.map(value=>value.toLocaleLowerCase())).size!==entries.length)fail(400,'Each pour needs a different name.');
+  if(!judges.length)fail(400,'Add at least one judge.');
+  if(new Set(judges.map(value=>value.toLocaleLowerCase())).size!==judges.length)fail(400,'Each judge needs a different name.');
+  const eventId=id(),created=now();
+  transaction(()=>{
+   db.run('INSERT INTO tasting_events(id,code,name,status,created_at,updated_at) VALUES(?,?,?,?,?,?)',eventId,code,eventName,'open',created,created);
+   db.run('INSERT INTO game_team_rules(event_id,team_size) VALUES(?,5)',eventId);
+   const entryIds=entries.map((name,i)=>{const entryId=id();db.run('INSERT INTO tasting_entries(id,event_id,seed,name,story) VALUES(?,?,?,?,?)',entryId,eventId,i+1,name,'Whiskey Draft entry.');return entryId;});
+   db.run('INSERT INTO tasting_matchups(id,event_id,round,slot,entry_a_id,entry_b_id) VALUES(?,?,?,?,?,?)',id(),eventId,1,1,entryIds[0],entryIds[1]);
+   db.run('INSERT INTO tasting_matchups(id,event_id,round,slot,entry_a_id,entry_b_id) VALUES(?,?,?,?,?,?)',id(),eventId,1,2,entryIds[2],entryIds[3]);
+   for(const name of judges){const judgeId=id();db.run('INSERT INTO tasting_judges(id,event_id,name) VALUES(?,?,?)',judgeId,eventId,name);db.run('INSERT INTO tasting_judge_users(judge_id,user_id,created_at) VALUES(?,?,?)',judgeId,user.id,created);}
+   db.run('INSERT INTO tasting_event_operators(event_id,user_id,created_at) VALUES(?,?,?)',eventId,user.id,created);
+  });
+  audit(user.id,null,'whiskey_draft.created',{eventId,code,entryCount:entries.length,judgeCount:judges.length});
+  return json(res,201,{ok:true,id:eventId,code});
+ }
  if(method==='POST'&&path.startsWith('/api/public/games/')&&path.endsWith('/link-device')){
   const code=path.split('/')[4],event=db.get("SELECT * FROM tasting_events WHERE code=? AND status!='draft'",code);if(!event)fail(404,'Event not found.');
   const raw=participantCookie(req);const participant=participantFor(context,event.id);if(!participant)fail(401,'Join the event first.');

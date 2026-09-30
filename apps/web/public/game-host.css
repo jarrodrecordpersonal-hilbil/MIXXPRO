@@ -2,6 +2,7 @@
 .game-host .panel{min-width:0;overflow-wrap:anywhere}.game-host form{display:grid;gap:14px;margin:18px 0}.game-host form .field{margin:0}
 .game-host form button{justify-self:start;white-space:normal}.game-host button,.game-host select{max-width:100%}.game-host .btn:disabled{opacity:.5;cursor:wait}
 .game-host-card{border-top:1px solid var(--line);padding:20px 0}.game-host-card:first-of-type{margin-top:16px}.game-host-card:last-child{padding-bottom:0}
+.game-creator{border-top:1px solid var(--line);margin-top:22px;padding-top:20px}.game-creator>summary{cursor:pointer;font-weight:700;color:var(--ink);min-height:32px}.game-creator[open]>summary{margin-bottom:8px}.game-creator input{text-transform:none}.game-creator input[name="code"]{text-transform:uppercase;letter-spacing:1px}
 .game-host-phases{display:flex;gap:8px;flex-wrap:wrap;padding:0;list-style:none;margin:24px 0 0}.game-host-phases li{padding:7px 12px;border:1px solid var(--line);border-radius:20px;font-size:12px;color:var(--muted)}
 .game-host-phases [aria-current]{background:#e2ecd9;color:#203723;border-color:#9eb58b;font-weight:700}
 .game-host-standings{padding-left:24px}.game-host-standings li{padding:12px 0;border-bottom:1px solid var(--line)}.game-host-standings li span{display:inline-block;width:calc(100% - 72px);vertical-align:top}.game-host-standings b{display:inline-block;text-align:right;width:68px}
