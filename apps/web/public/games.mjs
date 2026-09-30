@@ -2,6 +2,10 @@ const h=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 const code=decodeURIComponent(location.pathname.split('/').filter(Boolean)[1]||'').toUpperCase();
 const venueCode=new URL(location.href).searchParams.get('v')||'', $=id=>document.getElementById(id);
 let state=null,connected=false,busy=false,polling=false,generation=0,offset=0,renderKey='',uncertain=false,accountUserId=null;
+const bonusOpen=new Set();
+let pendingPickFocus=null;
+function rememberPickFocus(){const node=document.activeElement?.closest('[data-pick]');if(node)pendingPickFocus={...node.dataset};}
+function restorePickFocus(){if(!pendingPickFocus||busy)return;const data=pendingPickFocus;pendingPickFocus=null;const node=[...document.querySelectorAll('[data-pick]')].find(n=>n.dataset.matchup===data.matchup&&n.dataset.kind===data.kind&&n.dataset.judge===data.judge&&n.dataset.entry===data.entry);if(node&&!node.disabled)node.focus({preventScroll:true});}
 const clock=()=>Date.now()+offset;
 const feedback=message=>{$('feedback').textContent=message;};
 async function api(path,body){
@@ -23,16 +27,25 @@ function controls(){
   document.querySelectorAll('[data-pick]').forEach(b=>b.disabled=busy||!open(b.dataset.matchup));
   document.querySelectorAll('#join-form button,#resume-form button,#link-device,#account-panel button,#account-mode,#team-join').forEach(b=>b.disabled=busy||!connected);
   $('retry').disabled=busy||polling;
+  restorePickFocus();
 }
 function updateClock(){
   if(!state)return;
   const e=state.event,left=e.phaseDeadline?Math.max(0,Math.ceil((e.phaseDeadline-clock())/1000)):null;
   $('countdown').textContent=connected&&left!==null&&['predictions','judging'].includes(e.phase)?String(left):'';
   $('status').textContent=e.status==='final'?'Final results':e.phase==='predictions'?(left===0?'Predictions closed':'Make your picks before time runs out.'):e.phase==='judging'?'Judges are deciding.':e.phase==='results'?'Results are in.':'Waiting for the host.';
+  const isOpen=e.phase==='predictions'&&e.status==='live'&&(left===null||left>0);
+  const remaining=e.matchups.filter(m=>!e.outcomes.some(o=>o.matchupId===m.id)).length;
+  $('next-step').textContent=!connected?'Reconnecting. Your last confirmed picks are kept.':!state.participant&&e.status!=='final'?'Enter a name below to join. No account or purchase needed.':isOpen?'Tap one sample below. A check mark confirms your saved pick.':e.status==='final'?'This event is finished. Your published points are below.':e.phase==='results'?(remaining?'Result published. Stay here—the next round will appear automatically.':'All matchups revealed. Final standings follow when the host ends the event.'):'You’re in. The host will open the next pick here.';
   controls();
 }
 function render(data){
-  state=data;offset=data.serverTime-Date.now();
+  state=data;
+  document.body.dataset.format=data.event.format||'prediction';
+  const isBlend=data.event.format==='blending';
+  $('watch-drawer').hidden=!isBlend;
+  if(isBlend){$('game-brand-image').src='/bg-media/bourbon-games.png';$('game-brand-image').alt='Bourbon Games';$('game-brand-home').href='/blending/'+encodeURIComponent(data.event.seasonCode);$('game-brand-home').setAttribute('aria-label','Bourbon Games home');$('game-home-link').href='/blending/'+encodeURIComponent(data.event.seasonCode)+'?view=results';$('game-home-link').textContent='Scores';}
+  offset=data.serverTime-Date.now();
   $('open-preview-banner')?.classList.toggle('hidden',!data.openPreview);
   $('title').textContent=data.event.name;$('event-code').textContent=data.event.code;
   $('venue-context').textContent=data.venue?'Joining through '+data.venue.name:venueCode?'This venue link is not currently active.':'At the venue. At home. In the game.';
@@ -48,17 +61,20 @@ function render(data){
   const key=JSON.stringify([data.event,data.participant,data.predictions,data.standings]);
   if(key!==renderKey){
     renderKey=key;
+    rememberPickFocus();
     const names=new Map(data.event.entries.map(e=>[e.id,e.name]));
-    const visible=data.event.activeMatchupId&&!final?data.event.matchups.filter(m=>m.id===data.event.activeMatchupId):data.event.matchups;
+    const visible=final?data.event.matchups:data.event.activeMatchupId?data.event.matchups.filter(m=>m.id===data.event.activeMatchupId):data.event.matchups.filter(m=>!data.event.outcomes.some(o=>o.matchupId===m.id)).slice(0,1);
     const picks=(m,kind,judgeId,label)=>{
       const saved=data.predictions.find(p=>p.matchupId===m.id&&p.kind===kind&&p.judgeId===judgeId);
       return `<fieldset class="pick-group" data-pick-group="${h(kind)}" data-judge="${h(judgeId)}"><legend>${h(label)}</legend><div class="pick">${[m.entryAId,m.entryBId].map(id=>`<button type="button" data-pick data-matchup="${h(m.id)}" data-kind="${kind}" data-judge="${h(judgeId)}" data-entry="${h(id)}" aria-pressed="${saved?.entryId===id?'true':'false'}" aria-label="Pick ${h(names.get(id))}"><span>${saved?.entryId===id?'✓ SAVED':'YOUR PICK'}</span><strong>${h(names.get(id))}</strong></button>`).join('')}</div><p class="pick-note">${saved?'Saved: '+h(names.get(saved.entryId)):open(m.id)?'Choose one. You can change it while predictions are open.':'No pick saved for this matchup.'}</p></fieldset>`;
     };
     $('matchups').innerHTML=visible.map(m=>{
       const result=data.event.outcomes.find(o=>o.matchupId===m.id);
-      return `<article class="game-panel"><p class="eyebrow">ROUND ${h(m.round)} / MATCH ${h(m.slot)}</p><h2 class="match-title">${h(names.get(m.entryAId))}<em>VERSUS</em>${h(names.get(m.entryBId))}</h2>${result?`<p class="result-callout">Published winner: <strong>${h(names.get(result.winnerEntryId))}</strong>${result.revision>1?' · Corrected result':''}</p>`:''}${joined?picks(m,'bracket','','Who wins the matchup?')+data.event.judges.map(j=>picks(m,'judge',j.id,'Who will '+j.name+' choose?')).join(''):''}</article>`;
+      return `<article class="game-panel"><p class="eyebrow">ROUND ${h(m.round)} / MATCH ${h(m.slot)}</p><h2 class="match-title">${h(names.get(m.entryAId))}<em>VERSUS</em>${h(names.get(m.entryBId))}</h2>${result?`<p class="result-callout">Published winner: <strong>${h(names.get(result.winnerEntryId))}</strong>${result.revision>1?' · Corrected result':''}</p>`:''}${joined?picks(m,'bracket','','Who wins the matchup?')+(data.event.judges.length?`<details class="bonus-picks" data-bonus="${h(m.id)}" ${bonusOpen.has(m.id)?'open':''}><summary>Bonus picks · Read the judges <span>Optional</span></summary><p class="fine">Earn an extra point for each correct judge pick.</p>${data.event.judges.map(j=>picks(m,'judge',j.id,'Who will '+j.name+' choose?')).join('')}</details>`:''):''}</article>`;
     }).join('');
-    $('standings').innerHTML=data.standings.map((row,i)=>`<div ${row.participantId===data.participant?.id?'data-self':''}><span>${i+1}. ${h(row.name)}</span><b>${h(row.totalPoints)} pts</b></div>`).join('')||'<p class="muted">The field is open. Your name could be first.</p>';
+    let rank=0,previousPoints;
+    $('standings').innerHTML=data.standings.map((row,i)=>{if(row.totalPoints!==previousPoints)rank=i+1;previousPoints=row.totalPoints;return `<div ${row.participantId===data.participant?.id?'data-self':''}><span>${rank}. ${h(row.name)}</span><b>${h(row.totalPoints)} pts</b></div>`;}).join('')||'<p class="muted">The field is open. Your name could be first.</p>';
+
   }
   updateClock();
 }
@@ -96,7 +112,7 @@ async function refresh(){
   finally{polling=false;controls();}
 }
 async function mutate(path,body,message){
-  if(busy||!connected)return;busy=true;generation++;controls();feedback('Saving…');
+  if(busy||!connected)return;rememberPickFocus();busy=true;generation++;controls();feedback('Saving…');
   try{
     const result=await api(path,body),data=await api('');connected=true;render(data);$('connection').textContent='Connected · picks synced';
     feedback(message);return result;
@@ -105,6 +121,8 @@ async function mutate(path,body,message){
     else{uncertain=true;feedback('We could not confirm your last action. Reconnecting will check what was saved; your action will not be sent again automatically.');disconnected();}
   }finally{busy=false;controls();}
 }
+$('matchups').addEventListener('toggle',event=>{const el=event.target;if(el.isConnected&&el.matches('[data-bonus]')){if(el.open)bonusOpen.add(el.dataset.bonus);else bonusOpen.delete(el.dataset.bonus);}},true);
+$('watch-drawer').addEventListener('toggle',()=>{if(!$('watch-drawer').open)$('watch-drawer').querySelector('mixx-show')?.stop();});
 $('matchups').addEventListener('click',event=>{
   const b=event.target.closest('[data-pick]');if(!b||b.disabled)return;
   const entry=state.event.entries.find(e=>e.id===b.dataset.entry)?.name||'';

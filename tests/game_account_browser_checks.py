@@ -90,6 +90,8 @@ def account_game_checks(browser, owner, player, base, headers, database, out, pa
         for context, page, pid in players:
             expect(page.locator('#my-team')).to_contain_text('Roster locked.')
             for kind in ['bracket', 'judge']:
+                if kind == 'judge':
+                    page.locator('.bonus-picks > summary').click()
                 button = page.locator(f'[data-kind="{kind}"][data-entry="{entry_a}"]')
                 expect(button).to_be_enabled()
                 button.click()
