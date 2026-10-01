@@ -1,10 +1,10 @@
 """Render the fictional 90s rehearsal from the same cue sheet used by the game.
-Build-only dependencies: Python + Pillow, FFmpeg, espeak-ng (espeak fallback), DejaVu.
+Build-only dependencies: Python + Pillow, FFmpeg, DejaVu. Silent timing storyboard.
 No network assets, model downloads, live results or external API credentials.
 """
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-import array, json, math, shutil, subprocess, tempfile, wave
+import json, math, shutil, subprocess, tempfile
 
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'apps/web/public/rehearsal'
@@ -17,8 +17,7 @@ BOLD=lambda n: ImageFont.truetype(str(FONT/'DejaVuSans-Bold.ttf'),n)
 REG=lambda n: ImageFont.truetype(str(FONT/'DejaVuSans.ttf'),n)
 BG=Image.open(ROOT/'apps/web/public/bg-media/bourbon-games.png').convert('RGBA')
 MT=Image.open(ROOT/'apps/web/public/bg-media/mixx-tank.png').convert('RGBA')
-VOICE=shutil.which('espeak-ng') or shutil.which('espeak')
-if not VOICE or not shutil.which('ffmpeg'):raise RuntimeError('Install ffmpeg and espeak-ng first.')
+if not shutil.which('ffmpeg'):raise RuntimeError('Install ffmpeg first.')
 q=E['question']
 assert E['duration']==90 and 0<q['open']<q['close']<q['reveal']<90
 assert q['close']-q['open']==20
@@ -71,34 +70,15 @@ def backdrop(cue):
 def stamp(t):
     m,s=divmod(t,60);return f'{int(m):02d}:{int(s):02d}.{int((t%1)*1000):03d}'
 with tempfile.TemporaryDirectory(prefix='bg-film-') as temp:
-    temp=Path(temp);rate=22050;audio=array.array('h',[0])*int(E['duration']*rate);captions=['WEBVTT',''];script=['# Bourbon Games — 90-second interactive rehearsal','','Fictional practice only. Synthetic scratch narration; replace it with an approved host recording for release. No live outcomes or prizes.','','## Cue sheet','',f'Question opens **0:{q["open"]:02d}**, closes **0:{q["close"]:02d}**, reveal **1:{q["reveal"]-60:02d}**.','The video clock controls this practice run only. Live competition continues to use server/host deadlines.','']
-    for n,cue in enumerate(E['scenes']):
-        raw=temp/f'voice-{n}.wav';subprocess.run([VOICE,'-v','en-us','-s','165','-p','42','-w',str(raw),cue['narration']],check=True)
-        with wave.open(str(raw)) as f:dur=f.getnframes()/f.getframerate()
-        budget=cue['end']-cue['start']-.75
-        if dur>budget:
-            paced=temp/f'paced-{n}.wav'
-            subprocess.run(['ffmpeg','-y','-loglevel','error','-i',str(raw),'-af',f'atempo={dur/budget:.5f}','-ar',str(rate),'-ac','1',str(paced)],check=True);raw=paced
-        with wave.open(str(raw)) as f:
-            assert f.getnchannels()==1 and f.getsampwidth()==2 and f.getframerate()==rate
-            frames=array.array('h',f.readframes(f.getnframes()));duration=len(frames)/rate
-        begin=int((cue['start']+.30)*rate);assert begin+len(frames)<=int(cue['end']*rate)
-        audio[begin:begin+len(frames)]=frames
-        words=cue['narration'].split();chunks=[' '.join(words[i:i+10]) for i in range(0,len(words),10)]
-        for j,chunk in enumerate(chunks):captions += [f'00:{stamp(cue["start"]+.30+j*duration/len(chunks))} --> 00:{stamp(cue["start"]+.30+(j+1)*duration/len(chunks))}',chunk,'']
-        script += [f'### {int(cue["start"])//60}:{int(cue["start"])%60:02d}–{int(cue["end"])//60}:{int(cue["end"])%60:02d} | {cue["heading"]}',f'**HOST:** {cue["narration"]}',f'**ON SCREEN:** {cue["subheading"]}','']
-    # Original short signal tones, not licensed music or voice impersonation.
-    for start,freq in [(34,660),(54,330),(62,880)]:
-        for i in range(int(.16*rate)):
-            idx=int(start*rate)+i;v=int(1900*math.sin(2*math.pi*freq*i/rate)*(1-i/(.16*rate)))
-            audio[idx]=max(-32768,min(32767,audio[idx]+v))
-    wav=temp/'narration.wav'
-    with wave.open(str(wav),'wb') as f:f.setnchannels(1);f.setsampwidth(2);f.setframerate(rate);f.writeframes(audio.tobytes())
+    captions=['WEBVTT',''];script=['# Bourbon Games — host recording script','','NOT RECORDED. The technical timing video is silent. Record a real host using these cues, then edit picture and question timing together. Fictional rehearsal only; no prizes.','','## Cue sheet','',f'Question opens **0:{q["open"]:02d}**, closes **0:{q["close"]:02d}**, reveal **1:{q["reveal"]-60:02d}**.','This is the video timing mode. The quick UI test has no timer.','']
+    for cue in E['scenes']:
+        captions += [f'00:{stamp(cue["start"])} --> 00:{stamp(cue["end"])}',cue['heading']+' '+cue['subheading'],'']
+        script += [f'### {int(cue["start"])//60}:{int(cue["start"])%60:02d}–{int(cue["end"])//60}:{int(cue["end"])%60:02d} | {cue["heading"]}',f'**HOST TO RECORD:** {cue["narration"]}',f'**ON SCREEN:** {cue["subheading"]}','']
     (OUT/'captions.vtt').write_text('\n'.join(captions)+'\n')
     (OUT/'script.md').write_text('\n'.join(script)+'\n')
     plates={cue['kind']:backdrop(cue) for cue in E['scenes']}
     plates['welcome'].save(OUT/'poster.png',optimize=True)
-    cmd=['ffmpeg','-y','-loglevel','error','-f','rawvideo','-pixel_format','rgb24','-video_size',f'{W}x{H}','-framerate',str(FPS),'-i','pipe:0','-i',str(wav),'-c:v','libx264','-preset','veryfast','-crf','27','-pix_fmt','yuv420p','-g','24','-threads','2','-c:a','aac','-b:a','64k','-af','loudnorm=I=-18:TP=-1.5:LRA=11','-movflags','+faststart','-t',str(E['duration']),str(OUT/'episode.mp4')]
+    cmd=['ffmpeg','-y','-loglevel','error','-f','rawvideo','-pixel_format','rgb24','-video_size',f'{W}x{H}','-framerate',str(FPS),'-i','pipe:0','-c:v','libx264','-preset','veryfast','-crf','27','-pix_fmt','yuv420p','-g','24','-threads','2','-an','-movflags','+faststart','-t',str(E['duration']),str(OUT/'episode.mp4')]
     proc=subprocess.Popen(cmd,stdin=subprocess.PIPE)
     try:
         for i in range(int(E['duration']*FPS)):

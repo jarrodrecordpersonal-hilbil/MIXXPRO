@@ -10,7 +10,7 @@ import {seedBlendingPreview} from './blending-preview-seed.mjs';
 
 const TOKEN = '[A-Za-z0-9_-]+';
 const readPaths = [
-  /^\/rehearsal\/?$/, /^\/rehearsal\/(?:player\.mjs|engine\.mjs|style\.css|episode\.json|episode\.mp4|poster\.png|captions\.vtt|script\.md)$/,
+  /^\/rehearsal\/?$/, /^\/rehearsal\/(?:quick\.mjs|quick\.css|player\.mjs|engine\.mjs|style\.css|episode\.json|episode\.mp4|poster\.png|captions\.vtt|script\.md)$/,
   /^\/(?:game-media\.(?:mjs|css)|game-play\.css|game-day-polish\.css)$/,
   /^\/bg-media\/(?:watch\.(?:css|mjs)|episodes\.mjs|(?:mixx-tank|bourbon-games)\.png)$/,
   /^\/blending\/?$/, new RegExp(`^/blending/${TOKEN}$`),

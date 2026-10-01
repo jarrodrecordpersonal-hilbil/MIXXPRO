@@ -1,21 +1,25 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#171514"><title>Bourbon Games · Play the practice episode</title>
-<link rel="icon" href="/bg-media/bourbon-games.png"><link rel="stylesheet" href="/rehearsal/style.css"></head>
-<body><a class="skip" href="#question">Skip to the question</a><main class="shell">
-<header><a href="/blending" aria-label="Bourbon Games home"><img src="/bg-media/bourbon-games.png" alt="Bourbon Games" width="130" height="60"></a><span class="practice">PRACTICE · 21+</span><a class="back" href="/blending">All games</a></header>
-<div class="intro"><div><p class="eyebrow">MIXX TANK · INTERACTIVE REHEARSAL</p><h1>Watch. Make your pick.</h1><p>90 seconds. No kit, code or login.</p></div><div class="points"><span>Practice score</span><strong id="points">0 <small>/ 1</small></strong></div></div>
-<section class="episode" aria-label="Video and current question">
-<div class="screen"><video id="video" controls playsinline preload="metadata" poster="/rehearsal/poster.png" aria-label="Fictional Bourbon Games practice episode"><source src="/rehearsal/episode.mp4" type="video/mp4"><track kind="captions" src="/rehearsal/captions.vtt" srclang="en" label="English">Your browser needs an MP4-compatible video player.</video></div>
-<div class="transport"><button id="start" type="button" disabled>Loading episode…</button><span id="time" aria-label="Playback progress">0:00 / 1:30</span><span id="playback" role="status">Loading video</span></div>
-<section id="question" class="question" tabindex="-1" aria-labelledby="question-title">
-<div class="question-top"><p id="phase" class="eyebrow">ONE ROUND · ONE PICK</p><span id="countdown" aria-label="Seconds left to pick" hidden></span></div>
-<h2 id="question-title">Ready for your first round?</h2><p id="instruction">Press Play episode. Your question will appear here.</p>
-<div id="answers" class="answers" hidden></div><p id="feedback" role="status" aria-live="polite"></p>
-<div id="result" hidden><p id="verdict"></p><a class="next" href="/blending?view=enter">Make my own blend →</a></div>
-</section></section>
-<p id="error" role="alert" hidden></p><p id="storage-note" class="note">Practice only. Your pick stays in this tab; it never changes live scores.</p>
-<div class="after"><button type="button" id="restart" disabled>Restart practice</button><details><summary>How this works</summary><p>Watch the video. From 0:34 to 0:54, tap one sample. It saves immediately in this tab—there is no final answer sheet. Pausing or buffering pauses the practice clock.</p><p>Seeking past 0:54 locks this run, even if you rewind. Restart practice to try again. Live games use the host’s clock instead.</p><p>Keep the video inline to see the answer buttons. Full-screen or casting shows the video, not a paired live game.</p></details></div>
-<details class="script"><summary>Read the host script</summary><div id="transcript"></div></details>
-<footer><img src="/bg-media/mixx-tank.png" alt="MIXX TANK Productions" width="66" height="46"><p>Original rehearsal graphics and synthetic scratch narration.<br>Fictional samples and results. No purchase or alcohol needed to play. No prizes.</p></footer>
-</main><script type="module" src="/rehearsal/player.mjs"></script></body></html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#151515"><title>Bourbon Games · Quick test</title>
+<link rel="icon" href="/bg-media/bourbon-games.png"><link rel="stylesheet" href="/rehearsal/quick.css"></head>
+<body><a class="skip" href="#question">Skip to the game</a><main class="shell">
+<header class="brandbar"><a href="/blending" aria-label="Bourbon Games home"><img src="/bg-media/bourbon-games.png" width="150" height="70" alt="Bourbon Games"></a><span class="test-label">OPEN TEST <span>· 21+</span></span><a class="back" href="/blending">All games <span aria-hidden="true">↗</span></a></header>
+<div class="page-title"><div><p class="eyebrow">THE BLENDING GAMES</p><h1>Make your call.</h1></div><p>No video. No waiting.<br>Just try the game.</p></div>
+<section class="arena" id="question" aria-labelledby="question-title" tabindex="-1">
+<div class="matchbar"><span><b>MATCH 01</b><span class="divider">/</span> QUICK TEST</span><span class="score-label">YOUR PRACTICE SCORE <strong id="points">0 <small>/ 1</small></strong></span></div>
+<div class="game-body"><div class="question-copy"><p class="eyebrow" id="phase">PICK YOUR WINNER</p><h2 id="question-title">Who takes the win?</h2><p id="instruction">Choose a sample, then reveal the result.</p></div>
+<div class="choices" id="answers" role="group" aria-label="Choose your predicted winner">
+<button type="button" class="choice" data-choice="101" aria-pressed="false" disabled><span class="choice-top"><span class="choice-name">SAMPLE</span><span class="pick-mark" aria-hidden="true">↗</span></span><b class="number">101</b><span class="profile">Vanilla · rounded oak</span><span class="choice-status">TAP TO PICK</span><span class="judge-score" hidden></span></button>
+<span class="versus" aria-hidden="true">VS</span>
+<button type="button" class="choice" data-choice="102" aria-pressed="false" disabled><span class="choice-top"><span class="choice-name">SAMPLE</span><span class="pick-mark" aria-hidden="true">↗</span></span><b class="number">102</b><span class="profile">Spice · dark fruit</span><span class="choice-status">TAP TO PICK</span><span class="judge-score" hidden></span></button>
+</div>
+<div class="game-action"><p id="feedback" role="status" aria-live="polite">Loading the matchup…</p><button class="reveal" id="reveal" type="button" disabled><span>Reveal result</span><span aria-hidden="true">→</span></button><button class="reveal" id="restart" type="button" hidden><span>Try again</span><span aria-hidden="true">↺</span></button></div>
+<div class="result-note" id="result-note" hidden><span id="verdict"></span><a href="/blending?view=enter">Make my own blend ↗</a></div></div>
+<div class="arena-footer"><span id="step-pick" class="current">01 <b>MAKE A PICK</b></span><span id="step-reveal">02 <b>SEE THE RESULT</b></span><span class="practice-tag">PRACTICE ONLY</span></div>
+</section>
+<p id="error" role="alert" hidden></p><button id="retry" type="button" hidden>Try loading again</button>
+<div class="under-game"><p id="storage-note">Fictional samples and scores. No prizes. Your practice result never affects the live competition.</p><a class="timing-link" href="/rehearsal?mode=video">Test video timing ↗</a></div>
+<details class="help"><summary>How testing works</summary><p>Tap either sample, change your mind as often as you like, then press Reveal result. Try again starts a fresh run in this tab only. No login, kit code, purchase or alcohol is needed.</p><p>The optional timing check uses a silent storyboard. It is not the finished show. A host-led video will be produced separately.</p></details>
+<footer><span>A MIXX TANK PRODUCTION</span><img src="/bg-media/mixx-tank.png" alt="MIXX TANK" width="62" height="46"></footer>
+<noscript><p class="error">Enable JavaScript to make a practice pick. No entry has been submitted.</p></noscript>
+</main><script type="module" src="/rehearsal/quick.mjs"></script></body></html>

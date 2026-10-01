@@ -2,6 +2,7 @@ import {existsSync, readFileSync, statSync} from 'node:fs';
 const ROOT=new URL('../../web/public/rehearsal/',import.meta.url);
 const FILES=new Map([
  ['/rehearsal',['index.html','text/html; charset=utf-8']],['/rehearsal/',['index.html','text/html; charset=utf-8']],
+ ['/rehearsal/quick.mjs',['quick.mjs','text/javascript; charset=utf-8']],['/rehearsal/quick.css',['quick.css','text/css; charset=utf-8']],
  ['/rehearsal/player.mjs',['player.mjs','text/javascript; charset=utf-8']],['/rehearsal/engine.mjs',['engine.mjs','text/javascript; charset=utf-8']],
  ['/rehearsal/style.css',['style.css','text/css; charset=utf-8']],['/rehearsal/episode.json',['episode.json','application/json; charset=utf-8']],
  ['/rehearsal/episode.mp4',['episode.mp4','video/mp4']],['/rehearsal/poster.png',['poster.png','image/png']],
@@ -20,7 +21,7 @@ export function byteRange(header,size){
 }
 export async function rehearsalRoutes(c){
  if(!c.path.startsWith('/rehearsal'))return false;
- const asset=FILES.get(c.path);
+ const asset=['/rehearsal','/rehearsal/'].includes(c.path)&&c.url.searchParams.get('mode')==='video'?['timed.html','text/html; charset=utf-8']:FILES.get(c.path);
  if(!asset||!c.config.BLENDING_GAMES_ENABLED){c.json(c.res,404,{error:'Practice page not found.'});return true;}
  if(!['GET','HEAD'].includes(c.method)){c.res.setHeader('Allow','GET, HEAD');c.json(c.res,405,{error:'Practice is local to this tab. There is no submission API.'});return true;}
  const [name,mime]=asset,file=new URL(name,ROOT);

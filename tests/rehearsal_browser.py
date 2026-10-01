@@ -31,7 +31,7 @@ with (OUT/'server.log').open('w') as log:
    page.add_init_script("window.__csp=[];document.addEventListener('securitypolicyviolation',e=>window.__csp.push(e.violatedDirective));")
    try:
     before=ctx.request.get(BASE+'/api/public/games/BGDEMO').json()['standings']
-    page.goto(BASE+'/rehearsal',wait_until='domcontentloaded')
+    page.goto(BASE+'/rehearsal?mode=video',wait_until='domcontentloaded')
     expect(page.locator('#start')).to_be_enabled()
     expect(page.locator('#answers')).not_to_be_visible()
     assert page.locator('input').count()==0
@@ -42,7 +42,7 @@ with (OUT/'server.log').open('w') as log:
     assert media.headers['content-type']=='video/mp4'
     assert ctx.request.get(BASE+'/rehearsal/episode.mp4',headers={'Range':'bytes=999999999-'}).status==416
     assert ctx.request.get(BASE+'/rehearsal/captions.vtt').text().startswith('WEBVTT')
-    passed('No-code/no-login entry; real 90-second H264/AAC video with inline controls, captions and HTTP range support')
+    passed('No-code/no-login entry; real 90-second silent H264 video with inline controls, captions and HTTP range support')
     # Advance using the actual decoder. No mocked timeupdate events.
     seek(page,33.75);page.locator('#start').click()
     expect(page.locator('#answers')).to_be_visible(timeout=4000)
@@ -80,7 +80,7 @@ with (OUT/'server.log').open('w') as log:
     seek(page,40);expect(page.locator('[data-choice="101"]')).to_be_enabled()
     page.locator('[data-choice="101"]').click();seek(page,62)
     expect(page.locator('#verdict')).to_contain_text('0 practice points')
-    other=ctx.new_page();other.goto(BASE+'/rehearsal');expect(other.locator('#start')).to_be_enabled()
+    other=ctx.new_page();other.goto(BASE+'/rehearsal?mode=video');expect(other.locator('#start')).to_be_enabled()
     expect(other.locator('#points')).to_have_text('0 / 1')
     assert not writes,writes
     assert ctx.request.get(BASE+'/api/public/games/BGDEMO').json()['standings']==before
@@ -88,6 +88,7 @@ with (OUT/'server.log').open('w') as log:
     assert not errors,errors
     passed('Independent tab, honest wrong/no-pick results, restart, responsive widths and zero writes to live game APIs')
     report['passed']=True
+    ctx.close();browser.close()
    except Exception:
     page.screenshot(path=str(OUT/'failure.png'),full_page=True);raise
    finally:ctx.close();browser.close()

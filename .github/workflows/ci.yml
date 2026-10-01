@@ -91,19 +91,28 @@ jobs:
       - name: Install isolated rehearsal render and browser tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng fonts-dejavu-core
+          sudo apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core
           python -m pip install Pillow==11.3.0 playwright==1.57.0
           python -m playwright install --with-deps chromium
       - name: Build film from the game cue sheet
         run: python scripts/build_rehearsal.py
-      - name: Test real video and embedded-question timing
-        run: python tests/rehearsal_browser.py
+      - name: Test instant play and real video timing
+        run: |
+          python tests/quick_practice_browser.py
+          python tests/rehearsal_browser.py
+          test -z "$(ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 apps/web/public/rehearsal/episode.mp4)"
       - name: Build and smoke-test the actual deployment image
         run: |
           docker build -t bg-rehearsal:ci .
           docker run -d --name bg-rehearsal-check -p 3391:3000 -e BLENDING_OPEN_PREVIEW=true -e DEMO_MODE=false -e RENDER_EXTERNAL_URL=https://preview.example.test bg-rehearsal:ci
-          trap 'docker rm -f bg-rehearsal-check' EXIT
-          curl --fail --retry 12 --retry-delay 1 --retry-connrefused http://127.0.0.1:3391/api/health
+          mkdir -p artifacts/rehearsal
+          trap 'docker logs bg-rehearsal-check > artifacts/rehearsal/docker.log 2>&1; docker rm -f bg-rehearsal-check' EXIT
+          ready=false
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --show-error --max-time 2 http://127.0.0.1:3391/api/health; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
           curl --fail http://127.0.0.1:3391/rehearsal -o /tmp/rehearsal.html
           test "$(curl --silent --output /tmp/practice-range.bin --write-out '%{http_code}' -H 'Range: bytes=0-15' http://127.0.0.1:3391/rehearsal/episode.mp4)" = 206
           test "$(wc -c < /tmp/practice-range.bin)" = 16
