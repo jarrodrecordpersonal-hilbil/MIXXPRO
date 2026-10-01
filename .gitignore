@@ -14,3 +14,9 @@ dist/
 tests/fixtures/sample.mp4
 __pycache__/
 tests/fixtures/portrait.mp4
+
+# Reproducible practice film; built in Docker and CI, not committed as binary.
+/apps/web/public/rehearsal/episode.mp4
+/apps/web/public/rehearsal/poster.png
+/apps/web/public/rehearsal/captions.vtt
+/apps/web/public/rehearsal/script.md

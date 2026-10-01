@@ -100,6 +100,7 @@ def game_checks(browser, owner, player, base, headers, database, out, passed, wa
             assert accepted.value.status == 200
             judge_pick = matchup['entryAId'] if index in (0, 1) else matchup['entryBId']
             expect(pick).to_have_attribute('aria-pressed', 'true')
+            page.locator('.bonus-picks > summary').click()
             judge_button = page.locator(f'[data-pick][data-kind="judge"][data-judge="{judge["id"]}"][data-entry="{judge_pick}"]')
             with page.expect_response(lambda r: '/predict' in r.url and r.request.method == 'POST') as saved:
                 judge_button.click()

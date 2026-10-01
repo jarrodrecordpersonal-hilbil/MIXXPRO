@@ -1,0 +1,99 @@
+{
+  "id": "bg-practice-001",
+  "version": 1,
+  "title": "Make your first pick",
+  "mode": "practice",
+  "duration": 90,
+  "video": "/rehearsal/episode.mp4",
+  "caption": "/rehearsal/captions.vtt",
+  "disclaimer": "Fictional samples and results. Practice only; no prizes or live standings.",
+  "question": {
+    "id": "winner",
+    "text": "Which sample wins?",
+    "open": 34,
+    "close": 54,
+    "reveal": 62,
+    "points": 1,
+    "correct": "102",
+    "choices": [
+      {
+        "id": "101",
+        "name": "Sample 101",
+        "profile": "Vanilla · rounded oak",
+        "score": 93
+      },
+      {
+        "id": "102",
+        "name": "Sample 102",
+        "profile": "Spice · dark fruit",
+        "score": 96
+      }
+    ]
+  },
+  "scenes": [
+    {
+      "start": 0,
+      "end": 8,
+      "kind": "welcome",
+      "heading": "Watch. Pick. Play.",
+      "subheading": "One phone. One practice round.",
+      "narration": "Welcome to Bourbon Games. This is a practice round. No kit or account needed."
+    },
+    {
+      "start": 8,
+      "end": 20,
+      "kind": "sample101",
+      "heading": "Meet Sample 101",
+      "subheading": "Vanilla. Rounded oak.",
+      "narration": "First up, Sample one oh one. Imagine a rounded blend, with vanilla and oak. These samples and results are fictional, so you can learn the game."
+    },
+    {
+      "start": 20,
+      "end": 30,
+      "kind": "sample102",
+      "heading": "Meet Sample 102",
+      "subheading": "Spice. Dark fruit.",
+      "narration": "Next, Sample one oh two. A different direction: spice and dark fruit. Which one do you think our demo panel will choose?"
+    },
+    {
+      "start": 30,
+      "end": 34,
+      "kind": "prompt",
+      "heading": "Make your call.",
+      "subheading": "Your question opens next.",
+      "narration": "Make your call. Your question opens next."
+    },
+    {
+      "start": 34,
+      "end": 54,
+      "kind": "question",
+      "heading": "Which sample wins?",
+      "subheading": "Tap your pick below the video.",
+      "narration": "Picks are open. Tap Sample one oh one or Sample one oh two, just below this video. You can change your pick until the timer ends. Pausing pauses this practice round."
+    },
+    {
+      "start": 54,
+      "end": 62,
+      "kind": "locked",
+      "heading": "Picks are locked.",
+      "subheading": "The demo verdict is next.",
+      "narration": "Picks are locked. No more changes for this run. Here comes the demo verdict."
+    },
+    {
+      "start": 62,
+      "end": 78,
+      "kind": "reveal",
+      "heading": "Sample 102 wins.",
+      "subheading": "96 to 93 · fictional panel scores",
+      "narration": "Sample one oh two wins our fictional matchup, ninety six to ninety three. If that was your pick, you earned one practice point. Your score is right below the video."
+    },
+    {
+      "start": 78,
+      "end": 90,
+      "kind": "finish",
+      "heading": "That is how you play.",
+      "subheading": "Try again. Or make your own blend.",
+      "narration": "That is how you play. In a live game, the host controls the deadlines. Practice does not change live scores. Replay this round, or head to My blend. No kit code is required for this test."
+    }
+  ]
+}

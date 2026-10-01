@@ -5,7 +5,8 @@ export function eventView(db,event){
  const matchups=db.all('SELECT id,round,slot,entry_a_id AS entryAId,entry_b_id AS entryBId FROM tasting_matchups WHERE event_id=? ORDER BY round,slot',event.id);
  const judges=db.all('SELECT id,name FROM tasting_judges WHERE event_id=? ORDER BY name',event.id);
  const outcomes=db.all('SELECT o.matchup_id AS matchupId,o.winner_entry_id AS winnerEntryId,o.revision,o.published_at AS publishedAt,o.corrected_at AS correctedAt FROM tasting_outcomes o JOIN tasting_matchups m ON m.id=o.matchup_id WHERE m.event_id=?',event.id);
- return {id:event.id,code:event.code,name:event.name,status:event.status,phase:event.phase||'lobby',phaseDeadline:event.phase_deadline||null,activeMatchupId:event.active_matchup_id||null,stateRevision:event.state_revision||0,scoringVersion:event.scoring_version,teamRules:teamRules(db,event.id),entries,matchups,judges,outcomes};
+ const blending=db.get('SELECT s.code FROM blend_batches b JOIN blend_seasons s ON s.id=b.season_id WHERE b.event_id=?',event.id);
+ return {format:blending?'blending':'prediction',seasonCode:blending?.code||null,id:event.id,code:event.code,name:event.name,status:event.status,phase:event.phase||'lobby',phaseDeadline:event.phase_deadline||null,activeMatchupId:event.active_matchup_id||null,stateRevision:event.state_revision||0,scoringVersion:event.scoring_version,teamRules:teamRules(db,event.id),entries,matchups,judges,outcomes};
 }
 export async function gameRoutes(context){
  const {req,res,path,method,url,b,db,config,json,audit,transaction,access,admin,id,now,token,hash,fail,text,qrSvg}=context;

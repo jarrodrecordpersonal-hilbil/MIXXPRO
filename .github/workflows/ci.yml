@@ -59,9 +59,72 @@ jobs:
         run: python tests/native_browser.py
       - name: Venue music funding and Bunny setup browser acceptance
         run: python tests/activation_browser.py
+      - name: At-home blending and join-anytime browser acceptance
+        run: python tests/blending_browser.py
+      - name: Open preview no-login browser acceptance
+        run: python tests/blending_open_preview_browser.py
+      - name: Sports scoreboard and simple blending browser acceptance
+        run: python tests/blending_sports_browser.py
+      - name: MIXX TANK media and branded-thumbnail browser acceptance
+        run: python tests/blending_media_browser.py
+      - name: Branded watch-and-play acceptance
+        run: python tests/game_play_browser.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: mixxpro-native-browser
           path: artifacts/
+          retention-days: 14
+
+  rehearsal-browser:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated rehearsal render and browser tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core
+          python -m pip install Pillow==11.3.0 playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Build film from the game cue sheet
+        run: python scripts/build_rehearsal.py
+      - name: Test instant play and real video timing
+        run: |
+          python tests/quick_practice_browser.py
+          python tests/rehearsal_browser.py
+          test -z "$(ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 apps/web/public/rehearsal/episode.mp4)"
+      - name: Build and smoke-test the actual deployment image
+        run: |
+          docker build -t bg-rehearsal:ci .
+          docker run -d --name bg-rehearsal-check -p 3391:3000 -e BLENDING_OPEN_PREVIEW=true -e DEMO_MODE=false -e RENDER_EXTERNAL_URL=https://preview.example.test bg-rehearsal:ci
+          mkdir -p artifacts/rehearsal
+          trap 'docker logs bg-rehearsal-check > artifacts/rehearsal/docker.log 2>&1; docker rm -f bg-rehearsal-check' EXIT
+          ready=false
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --show-error --max-time 2 http://127.0.0.1:3391/api/health; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
+          curl --fail http://127.0.0.1:3391/rehearsal -o /tmp/rehearsal.html
+          test "$(curl --silent --output /tmp/practice-range.bin --write-out '%{http_code}' -H 'Range: bytes=0-15' http://127.0.0.1:3391/rehearsal/episode.mp4)" = 206
+          test "$(wc -c < /tmp/practice-range.bin)" = 16
+          docker exec bg-rehearsal-check sh -c '! command -v ffmpeg'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bourbon-games-rehearsal
+          path: |
+            artifacts/rehearsal/
+            apps/web/public/rehearsal/episode.mp4
+            apps/web/public/rehearsal/poster.png
+            apps/web/public/rehearsal/captions.vtt
+            apps/web/public/rehearsal/script.md
           retention-days: 14
