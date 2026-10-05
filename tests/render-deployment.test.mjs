@@ -17,10 +17,10 @@ test('Render pilot is one persistent Docker service, not an ephemeral free/stati
   assert.equal(env.DB_PATH.value,service.disk.mountPath+'/mixxpro.sqlite');
   assert.equal(blueprint.databases,undefined);assert.equal(service.scaling,undefined);
 });
-test('GoDaddy domain target and application origin agree, without rebranding MIXDATA',()=>{
+test('GoDaddy domain target and application origin agree with MIXX MEASURE branding',()=>{
   assert.deepEqual(service.domains,['mixxwave.com']);
   assert.equal(env.APP_ORIGIN.value,'https://mixxwave.com');
-  assert.match(readFileSync(new URL('../apps/web/screens/index.html',import.meta.url),'utf8'),/MIXDATA/);
+  assert.match(readFileSync(new URL('../apps/web/screens/index.html',import.meta.url),'utf8'),/MIXX MEASURE/);
 });
 test('Bunny and Google credentials are requested privately and application secret is host-generated',()=>{
   for(const key of ['BUNNY_LIBRARY_ID','BUNNY_API_KEY','BUNNY_CDN_HOST','BUNNY_TOKEN_KEY','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET']){
