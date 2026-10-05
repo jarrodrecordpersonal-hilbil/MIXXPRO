@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createApplication,configuration} from '../apps/server/app.mjs';
 
-test('venue chrome uses the MIXXWAVE mark while MIXDATA remains separate',()=>{
+test('venue chrome uses the MIXXWAVE mark while MIXX MEASURE remains separate',()=>{
   const link=readFileSync(new URL('../apps/web/screens/link.mjs',import.meta.url),'utf8');
   const logo=readFileSync(new URL('../apps/web/public/mixxwave-logo.svg',import.meta.url),'utf8');
-  assert.match(link,/MIXXWAVE/);assert.match(link,/mixxwave-logo\.svg/);assert.match(link,/MIXDATA/);
+  assert.match(link,/MIXXWAVE/);assert.match(link,/mixxwave-logo\.svg/);assert.match(link,/MIXX MEASURE/);
   assert.match(logo,/<title id="title">MIXX WAVE<\/title>/);assert.match(logo,/fill="#FFFFFF"/);
 });
 
