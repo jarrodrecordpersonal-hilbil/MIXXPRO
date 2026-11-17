@@ -1,7 +1,15 @@
-import {openDatabase} from '../apps/server/db.mjs';
 import {configuration} from '../apps/server/app.mjs';
-import {resolve,dirname} from 'node:path';
-import {mkdirSync} from 'node:fs';
-const config=configuration(),target=resolve(process.argv[2]||`data/backups/mixxpro-${Date.now()}.sqlite`);
-mkdirSync(dirname(target),{recursive:true,mode:0o700});const db=openDatabase(config.DB_PATH);
-db.run('VACUUM INTO ?',target);db.close();console.log('Consistent database backup created:',target);
+import {createVerifiedBackup} from './backup-utils.mjs';
+import {resolve} from 'node:path';
+
+const destination=resolve(process.argv[2]||`data/backups/mixxpro-${Date.now()}.sqlite`);
+try{
+  const outcome=await createVerifiedBackup(configuration().DB_PATH,destination);
+  console.log('Verified MIXXWAVE database backup:',outcome.target);
+  console.log('Bytes:',outcome.bytes,'SHA-256:',outcome.sha256);
+  console.log('Checksum file:',outcome.checksumFile);
+  console.log('Transfer both files to off-host private storage and test a restore.');
+}catch(error){
+  console.error('Backup not created:',error.message);
+  process.exitCode=1;
+}
