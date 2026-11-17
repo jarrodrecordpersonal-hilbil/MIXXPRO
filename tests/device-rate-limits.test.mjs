@@ -44,7 +44,7 @@ test('an authenticated TV still works if a shared reverse-proxy IP quota is full
       app.db.run('INSERT INTO tvs(id,venue_id,name,group_name,token_hash,last_seen,created_at) VALUES(?,?,?,?,?,?,?)',
         tvId,venueId,tvId,'',hash(token),now,now);
     // Render's direct-peer IP may be the same for many independent TVs.
-    app.db.run('INSERT INTO rate_limits(key,hits,expires_at) VALUES(?,?,?)',
+    app.db.run('INSERT INTO rate_limits(key,hits,expires_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET hits=excluded.hits,expires_at=excluded.expires_at',
       'general:127.0.0.1',6000,now+60000);
     const state=async token=>fetch(base+'/api/player/state',{headers:{Authorization:'Bearer '+token}});
     assert.equal((await state(a)).status,200);
@@ -52,7 +52,7 @@ test('an authenticated TV still works if a shared reverse-proxy IP quota is full
     const ordinary=await fetch(base+'/api/health');
     assert.equal(ordinary.status,429);
     assert.equal((await state('Z'.repeat(43))).status,429);
-    app.db.run('INSERT INTO rate_limits(key,hits,expires_at) VALUES(?,?,?)',
+    app.db.run('INSERT INTO rate_limits(key,hits,expires_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET hits=excluded.hits,expires_at=excluded.expires_at',
       'device-api:tv-rate-a',300,now+60000);
     assert.equal((await state(a)).status,429);
     assert.equal((await state(b)).status,200);
