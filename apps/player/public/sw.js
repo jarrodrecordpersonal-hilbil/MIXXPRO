@@ -1,5 +1,5 @@
-const CACHE='mixxpro-player-shell-v8';
-const FILES=['/player/','/player/player.mjs','/player/offline.mjs','/player/event-outbox.mjs','/player/games.css','/player/billboards.mjs','/player/billboards.css','/style.css','/shared/domain.mjs','/icon.svg','/player/manifest.webmanifest'];
+const CACHE='mixxpro-player-shell-v9';
+const FILES=['/player/','/player/player.mjs','/player/offline.mjs','/player/event-outbox.mjs','/player/startup.mjs','/player/games.css','/player/billboards.mjs','/player/billboards.css','/style.css','/shared/domain.mjs','/icon.svg','/player/manifest.webmanifest'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting();});
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('mixxpro-player-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{

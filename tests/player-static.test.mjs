@@ -17,6 +17,11 @@ test('TV can import its outbox module without opening unrelated server files', a
   assert.match(module.headers.get('content-type') || '', /javascript/);
   assert.match(await module.text(), /export async function drainEventOutbox/);
 
+  const startup = await fetch(base + '/player/startup.mjs');
+  assert.equal(startup.status,200);
+  assert.match(startup.headers.get('content-type') || '',/javascript/);
+  assert.match(await startup.text(),/export async function loadSavedCredential/);
+
   const privateFile = await fetch(base + '/player/.env');
   assert.equal(privateFile.status, 404);
 });
