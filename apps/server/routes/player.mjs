@@ -66,9 +66,17 @@ export async function playerRoutes(context){
       }
       if(method==='POST'&&path==='/api/player/ack'){
         const {tv}=device(req);integer(b.id,'Command ID',1,Number.MAX_SAFE_INTEGER);
-        const command=db.get('SELECT id,payload FROM commands WHERE id=? AND tv_id=?',b.id,tv.id);if(!command)fail(404,'Command not found.');
-        const result=b.status===undefined?'applied':choice(b.status,['applied','blocked'],'command result'),detail=text(b.detail||'','Result detail',160,true),payload={...parse(command.payload,{}),result,resultDetail:detail};
-        transaction(()=>{db.run('UPDATE commands SET payload=?,ack_at=COALESCE(ack_at,?) WHERE id=? AND tv_id=?',JSON.stringify(payload),now(),b.id,tv.id);db.run('UPDATE tvs SET last_ack=MAX(last_ack,?) WHERE id=?',b.id,tv.id);});return json(res,200,{ok:true,status:result});
+        const result=b.status===undefined?'applied':choice(b.status,['applied','blocked'],'command result'),detail=text(b.detail||'','Result detail',160,true);
+        const confirmed=transaction(()=>{
+          const command=db.get('SELECT id,payload,ack_at FROM commands WHERE id=? AND tv_id=?',b.id,tv.id);
+          if(!command)fail(404,'Command not found.');
+          // Network retries cannot overwrite a previously confirmed player result.
+          if(command.ack_at!==null)return parse(command.payload,{}).result||'applied';
+          const payload={...parse(command.payload,{}),result,resultDetail:detail};
+          db.run('UPDATE commands SET payload=?,ack_at=? WHERE id=? AND tv_id=? AND ack_at IS NULL',JSON.stringify(payload),now(),b.id,tv.id);
+          db.run('UPDATE tvs SET last_ack=MAX(last_ack,?) WHERE id=?',b.id,tv.id);
+          return result;
+        });return json(res,200,{ok:true,status:confirmed});
       }
       if(method==='GET'&&path==='/api/player/manifest'){
         const {tv,venue}=device(req);rateLimit(db,`manifest:${tv.id}`,40,60000);return json(res,200,manifest(tv,venue));
