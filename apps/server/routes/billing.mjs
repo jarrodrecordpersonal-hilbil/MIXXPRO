@@ -2,15 +2,16 @@
 export async function billingRoutes(context){
   const {req,res,path,method,url,ip,b,raw,db,config,json,audit,transaction,readSession,requireSession,access,admin,device,getVenue,schedulesFor,tvRows,issueSession,createVenue,enqueue,summarize,effective,manifest,billing,id,now,types,DEFAULT_MIX,parse,escape,token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit,fail,text,integer,choice,mixDefinition,WORLDS,THEMES,hardwareEligible,commission,bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,destinationUrl,qrSvg}=context;
       if(method==='GET'&&path==='/api/billing'){
-        const {venue}=access(req);const plans=[{id:'free',name:'Free',amount:0,available:true}];
-        for(const [key,name]of [['paid','Ad-free'],['premium','Premium clean']]){
+        const {venue}=access(req);const paidPlansAvailable=config.VENUE_PAID_PLANS_ENABLED==='true';const plans=[{id:'free',name:'Free',amount:0,available:true}];
+        if(paidPlansAvailable)for(const [key,name]of [['paid','Ad-free'],['premium','Premium clean']]){
           const priceId=config[`STRIPE_PRICE_${key.toUpperCase()}`];let amount=null,available=false;
           if(priceId&&config.STRIPE_SECRET_KEY){const p=await billing(config,`prices/${encodeURIComponent(priceId)}`);if(p.active&&p.currency==='usd'&&p.recurring?.interval==='month'&&p.billing_scheme==='per_unit'&&Number.isSafeInteger(p.unit_amount)){amount=p.unit_amount;available=true;}}
           plans.push({id:key,name,amount,available});
-        }return json(res,200,{plan:venue.plan,seats:venue.seats,tvCount:tvRows(venue.id).length,plans,connected:!!config.STRIPE_SECRET_KEY,subscription:!!venue.stripe_subscription&&!['canceled','incomplete_expired'].includes(venue.billing_status)});
+        }return json(res,200,{plan:venue.plan,seats:venue.seats,tvCount:tvRows(venue.id).length,plans,paidPlansAvailable,connected:!!config.STRIPE_SECRET_KEY,subscription:!!venue.stripe_subscription&&!['canceled','incomplete_expired'].includes(venue.billing_status)});
       }
       if(method==='POST'&&path==='/api/billing/checkout'){
         const {venue,user,role}=access(req,true);if(role!=='owner')fail(403,'Only the venue owner can change billing.');
+        if(config.VENUE_PAID_PLANS_ENABLED!=='true')fail(403,'New venue subscriptions are disabled. MIXXWAVE is free for venues.');
         const plan=choice(b.plan,['paid','premium'],'plan'),seats=integer(b.seats,'TV seats',Math.max(1,tvRows(venue.id).length),100);
         if(venue.stripe_subscription&&!['canceled','incomplete_expired'].includes(venue.billing_status))fail(409,'Manage your existing subscription in the billing portal.');
         const price=config[`STRIPE_PRICE_${plan.toUpperCase()}`];if(!price)fail(503,'This plan is not priced yet. No payment has been taken.');
