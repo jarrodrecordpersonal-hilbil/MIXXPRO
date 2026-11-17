@@ -31,3 +31,12 @@ Online status comes from recent heartbeats. Download totals come from cached med
 ## Commerce scope
 
 Events, barrel picks, labels and referrals have working promotion/request hooks. Actual retail fulfillment, bottle-label approval, pick allocations, referral incentive payouts and licensed merchant responsibilities are not automated in this pilot.
+
+## MIXXWAVE sponsor-funded venue policy (2026-11-16)
+
+- Venue programming and the player are free to the venue. Advertisers and sponsors fund the network; there is no required venue subscription fee.
+- The API exposes only the Free plan and rejects new venue subscription checkouts unless an operator explicitly enables `VENUE_PAID_PLANS_ENABLED=true`. This opt-in keeps dormant legacy paid-plan functionality available without deleting it.
+- Existing subscriptions remain visible to their owners and their Stripe billing portal and authenticated webhook reconciliation stay functional; no subscriptions are automatically canceled or refunded by this change.
+- Free player/remote/pairing, scheduling, sponsor insertion and MIXDATA remain in place. Free TV allowance is a separately configurable pilot limit, not a mandatory venue subscription price.
+- Sponsored placements require independent commercial approvals and creative rights; reported playback is not human viewership. No assumptions about sponsor sales or signed venue agreements are made by this code change.
+- This policy does not modify hardware purchasing, installation agreements, or the legally separated SWAY business.
