@@ -41,7 +41,9 @@ jobs:
           retention-days: 14
   native-browser:
     needs: test
-    runs-on: ubuntu-latest
+    # Playwright 1.57 Chromium installers do not support Ubuntu 26.04;
+    # pin the runner so a hosted-image change cannot silently break QA.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
