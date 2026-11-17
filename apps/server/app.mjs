@@ -17,6 +17,7 @@ import {resolve,extname} from 'node:path';
 import {isIP} from 'node:net';
 import {openDatabase} from './db.mjs';
 import {token,hash,mac,equal,passwordHash,verifyPassword,verifyHook,rateLimit} from './security.mjs';
+import {limitApiRequest} from './api-rate-limits.mjs';
 import {WORLDS,THEMES,fail,text,integer,choice,mixDefinition,rotation,entitled,hardwareEligible,activeSchedule,commission} from '../../packages/domain/src/runtime.mjs';
 import {bunnyUrl,bunnyList,bunnyVideo,r2UploadUrl,stripe,destinationUrl} from './integrations.mjs';
 import {qrSvg} from './qr.mjs';
@@ -129,7 +130,7 @@ export function createApplication(options={}){
       const url=new URL(req.url,'http://local'),path=url.pathname,method=req.method;
       const forwarded=req.headers['x-real-ip'];
       const ip=config.TRUST_PROXY==='true'&&typeof forwarded==='string'&&isIP(forwarded)?forwarded:(req.socket.remoteAddress||'unknown');
-      if(path.startsWith('/api/'))rateLimit(db,`general:${ip}`,6000,60000);
+      if(path.startsWith('/api/'))limitApiRequest(db,{path,ip,authorization:req.headers.authorization});
       const mutation=['POST','PATCH','DELETE','PUT'].includes(method);
       if(mutation&&!path.startsWith('/api/hooks/')){
         if(req.headers.origin&&req.headers.origin!==config.APP_ORIGIN)fail(403,'Request origin was not allowed.');
