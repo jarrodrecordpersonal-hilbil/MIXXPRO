@@ -260,6 +260,42 @@ with tempfile.TemporaryDirectory(prefix='mixxpro-native-') as temp:
                     page.locator('[data-action="quick-command"][data-kind="play"]').click()
                     wait(player, "!document.getElementById('video').paused", timeout=12000)
                     passed('Cloud pause and play control the native video element')
+                    # Drop exactly one device ACK to simulate a completed remote action
+                    # whose acknowledgment was lost on the network.
+                    tvs = owner.request.get(BASE + '/api/venue', headers=headers).json()['tvs']
+                    main_tv_id = next(tv['id'] for tv in tvs if tv['name'] == 'Main Bar')
+                    player.evaluate("""() => {
+                        const realFetch=window.fetch.bind(window);
+                        let dropped=false;
+                        window.fetch=(resource, options) => {
+                          if(!dropped && String(resource).endsWith('/api/player/ack') && options?.method==='POST'){
+                            dropped=true;window.__ackTestDropped=true;
+                            return Promise.reject(new TypeError('Simulated lost command acknowledgment'));
+                          }
+                          return realFetch(resource, options);
+                        };
+                    }""")
+                    command_response = owner.request.post(BASE + '/api/commands', headers=headers,
+                        data={'kind':'volume','ids':[main_tv_id],'volume':63})
+                    assert command_response.status == 200, command_response.text()
+                    command_id = command_response.json()['commands'][0]['id']
+                    wait(player, "Math.abs(document.getElementById('video').volume-.63)<.001", timeout=12000)
+                    wait(player, "window.__ackTestDropped===true", timeout=12000)
+                    wait(player, "async()=>{const {get}=await import('/player/offline.mjs');return (await get('kv','pendingAck'))?.value?.id==="+str(command_id)+";}", timeout=12000)
+                    result = None
+                    for _ in range(45):
+                        result = owner.request.get(BASE + '/api/commands/status?ids=' + str(command_id), headers=headers).json()['commands'][0]
+                        if result['status'] == 'applied':
+                            break
+                        time.sleep(.5)
+                    assert result['status'] == 'applied', result
+                    assert result['detail'] == 'Player Volume 63%', result
+                    wait(player, "async()=>{const {get}=await import('/player/offline.mjs');return !(await get('kv','pendingAck'));}", timeout=12000)
+                    restore = owner.request.post(BASE + '/api/commands', headers=headers,
+                        data={'kind':'volume','ids':[main_tv_id],'volume':55})
+                    assert restore.status == 200, restore.text()
+                    wait(player, "Math.abs(document.getElementById('video').volume-.55)<.001", timeout=12000)
+                    passed('Lost remote acknowledgment is retried without downgrading the applied result')
                     player.screenshot(path=str(OUT / 'native-player.png'))
                     player.screenshot(path=str(OUT / 'native-player-audio.png'))
                     credential = player.evaluate("async()=>{const {get}=await import('/player/offline.mjs');return (await get('kv','credential')).value;}")

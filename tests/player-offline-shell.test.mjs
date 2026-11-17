@@ -10,7 +10,7 @@ test('offline shell caches every imported player module and uses matching versio
     .map(m=>m[1]).filter(p=>p.startsWith('./'))
     .map(p=>'/player/'+p.slice(2));
   for(const path of imports) assert.ok(sw.includes("'"+path+"'"),'Missing offline import '+path);
-  assert.match(sw,/const CACHE='mixxpro-player-shell-v7'/);
-  assert.match(player,/register\('\/player\/sw\.js\?v=7'/);
-  assert.match(html,/src="\/player\/player\.mjs\?v=7"/);
+  assert.match(sw,/const CACHE='mixxpro-player-shell-v8'/);
+  assert.match(player,/register\('\/player\/sw\.js\?v=8'/);
+  assert.match(html,/src="\/player\/player\.mjs\?v=8"/);
 });
