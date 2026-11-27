@@ -141,6 +141,18 @@ html{scroll-padding-top:126px}section{scroll-margin-top:126px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
 @media print{.topbar,.readprogress,.hero .actions,.join-actions,.carecard a{display:none}.hero,.join{background:#fff;color:#111}.hero .intro,.join .intro{color:#333}.section{padding:20px 0}.statgrid{grid-template-columns:repeat(3,1fr)}.ledger table{min-width:auto}.footer{background:#fff;color:#333}}
+
+/* Disclosure: deeper, less flattering markers are accessible immediately below six highlighted personal changes. */
+.deeper{border:1px solid #d7e2d3;background:#fff;border-radius:16px;margin:21px 0 0;overflow:hidden}
+.deeper summary{padding:18px 22px;display:flex;gap:18px;justify-content:space-between;align-items:center;cursor:pointer;list-style:none;color:#345c45;font-weight:830;font-size:13px;line-height:1.5}
+.deeper summary::-webkit-details-marker{display:none}
+.deeper summary span{font-size:23px;color:#659b6e;font-weight:400;transition:transform .18s}
+.deeper[open] summary span{transform:rotate(45deg)}
+.deeper-body{border-top:1px solid #e1eae0;padding:13px 22px 17px}
+.deeper-body p{font-size:12px;line-height:1.85;color:#536b5a;margin:4px 0 9px}
+.deeper-body strong{color:#855037}
+@media(max-width:650px){.deeper summary{padding:16px;font-size:12px}.deeper-body{padding:12px 16px}}
+@media print{.deeper{break-inside:avoid}}
 </style>
 </head>
 <body>
@@ -156,16 +168,16 @@ html{scroll-padding-top:126px}section{scroll-margin-top:126px}
  <div class="container hero-layout">
   <div><span class="label">01 / 05 — DRZ Daily</span>
    <h1>Better health.<br><em>Less guesswork.</em></h1>
-   <p class="intro">A simple 90-day starting point built from my own journey. See your numbers, create better habits, and bring better questions to your doctor. One plan. Six steps. No miracle claims.</p>
+   <p class="intro">Over roughly 18 months, I lost about 40 pounds and saw meaningful changes in my bloodwork. I also learned why knowing your numbers matters. DRZ Daily turns those lessons into a six-step, 90-day starting plan you can discuss with your doctor.</p>
    <div class="actions"><a class="btn glow" href="#results">See my actual results <span aria-hidden="true">↗</span></a><a class="btn light" href="#join">Join the founding list <span aria-hidden="true">→</span></a></div>
    <p class="hero-note">Founding-stage preview. No purchases, lab uploads or medical-data collection here. My personal results aren't typical or guaranteed.</p>
   </div>
   <aside class="founder" aria-label="My personal journey">
    <span class="founder-label">The personal story</span>
    <div class="founder-metric">245 <small>→</small> 205</div>
-   <p>About 40 pounds (roughly −16.3%) lost and maintained. My journey involved medical care, weight-management medication, training and daily changes.</p>
+   <p>About 40 pounds (roughly 16%) lost and maintained, according to my personal history. Medical care, weight-management medication, training and daily habits were all part of the journey.</p>
    <div class="founder-small"><b>18 months</b> of learning. <b>90 days</b> to start organizing your own plan.</div>
-   <div class="under-note">My results happened before this program existed. DRZ Daily did not cause them.</div>
+   <div class="under-note">Saved scale screenshots separately record 227.0 and 208.6 lb; their year is not shown. My results happened before this program existed. DRZ Daily did not cause them.</div>
   </aside>
  </div>
 </section>
@@ -173,17 +185,24 @@ html{scroll-padding-top:126px}section{scroll-margin-top:126px}
 <section id="results" class="section proof">
  <div class="container">
   <div class="sectionhead"><div><span class="label">02 / 05 — Real numbers</span><h2 class="title">Proof in the data.<br>Not promises.</h2></div>
-   <p class="intro">My Quest labs from <strong>June 5, 2024</strong> through <strong>October 9, 2025</strong> show improvement in some markers and worsening in others. Here's both.</p>
+   <p class="intro">My Quest labs document approximately <strong>16 months</strong> of comparisons, from <strong>June 5, 2024</strong> through <strong>October 9, 2025</strong>. These six results tell part of my longer 18-month story. The complete picture—including markers that worsened—is below.</p>
   </div>
   <div class="statgrid">
-   <article class="stat"><small>ALT · liver enzyme</small><strong>−63.6%</strong><span>77 → 28 U/L</span><p>Moved into reference range</p></article>
-   <article class="stat"><small>Triglycerides</small><strong>−46.1%</strong><span>154 → 83 mg/dL</span><p>Decreased</p></article>
-   <article class="stat"><small>Total cholesterol</small><strong>−20.8%</strong><span>245 → 194 mg/dL</span><p>Decreased</p></article>
-   <article class="stat"><small>Apolipoprotein B</small><strong>−14.4%</strong><span>139 → 119 mg/dL</span><p>Lower, still elevated</p></article>
-   <article class="stat alert"><small>LDL particle number</small><strong>+32.4%</strong><span>1,261 → 1,670 nmol/L</span><p>Higher; deserves follow-up</p></article>
-   <article class="stat alert"><small>Small LDL particles</small><strong>+103.1%</strong><span>227 → 461 nmol/L</span><p>Higher; deserves follow-up</p></article>
+   <article class="stat"><small>ALT · liver enzyme</small><strong>−63.6%</strong><span>77 → 28 U/L</span><p>Elevated to within lab reference range</p></article>
+   <article class="stat"><small>Triglycerides</small><strong>−46.1%</strong><span>154 → 83 mg/dL</span><p>Lower in follow-up test</p></article>
+   <article class="stat"><small>AST · liver enzyme</small><strong>−30.3%</strong><span>33 → 23 U/L</span><p>Within reference range at both points</p></article>
+   <article class="stat"><small>Insulin resistance score</small><strong>−29.7%</strong><span>74 → 52</span><p>Improved, though not in optimal range</p></article>
+   <article class="stat"><small>Total cholesterol</small><strong>−20.8%</strong><span>245 → 194 mg/dL</span><p>Lower in follow-up test</p></article>
+   <article class="stat"><small>Apolipoprotein B</small><strong>−14.4%</strong><span>139 → 119 mg/dL</span><p>Improved but remained elevated</p></article>
   </div>
-  <p class="proof-warning"><strong>These are personal, historical measurements, not a clinical study.</strong> Percentage changes do not necessarily mean health improved. Treatment and other factors may have affected results; discuss risk markers with your clinician.</p>
+  <details class="deeper">
+   <summary>What the deeper cholesterol testing revealed <span aria-hidden="true">+</span></summary>
+   <div class="deeper-body">
+    <p>Better total cholesterol was not the whole story. My LDL particle number increased from <strong>1,261 to 1,670 nmol/L (+32.4%)</strong>, while small LDL particles rose from <strong>227 to 461 nmol/L (+103.1%)</strong>. These are real concerns to review with my clinician—not wins to hide or a reason to promise that everyone needs the same tests.</p>
+    <p>My story is about learning what to measure and following up with a doctor. The complete lab comparison is below.</p>
+   </div>
+  </details>
+  <p class="proof-warning"><strong>These are personal, historical measurements, not a clinical study.</strong> A favorable percentage change is not proof of disease reversal or an outcome from a supplement program. Prescription treatment, weight management, training and other factors may have contributed. Some risk markers still warrant medical follow-up.</p>
   <details class="ledger" id="full-labs">
    <summary><span><strong>See all 55 lab-marker percentage changes</strong><small>Full breakdown: cholesterol, metabolic health, liver, kidneys, blood counts and nutrients</small></span><span class="plus" aria-hidden="true">+</span></summary>
    <div class="table-scroll"><table>
